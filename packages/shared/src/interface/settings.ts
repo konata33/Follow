@@ -29,6 +29,7 @@ export interface UISettings {
   codeHighlightThemeLight: string
   codeHighlightThemeDark: string
   guessCodeLanguage: boolean
+  hideRecentReader: boolean
 
   // view
   pictureViewMasonry: boolean
@@ -56,4 +57,8 @@ export interface IntegrationSettings {
   enableOmnivore: boolean
   omnivoreEndpoint: string
   omnivoreToken: string
+
+  // obsidian
+  enableObsidian: boolean
+  obsidianVaultPath: string
 }
