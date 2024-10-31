@@ -1,3 +1,9 @@
+import type {
+  CombinedEntryModel,
+  FeedModel,
+  FeedOrListRespModel,
+  UserModel,
+} from "@follow/models/types"
 import { produce } from "immer"
 import { omit } from "lodash-es"
 import { nanoid } from "nanoid"
@@ -5,13 +11,6 @@ import { nanoid } from "nanoid"
 import { whoami } from "~/atoms/user"
 import { runTransactionInScope } from "~/database"
 import { apiClient } from "~/lib/api-fetch"
-import type {
-  CombinedEntryModel,
-  FeedModel,
-  FeedOrListModel,
-  FeedOrListRespModel,
-  UserModel,
-} from "~/models"
 import { FeedService } from "~/services"
 
 import { getSubscriptionByFeedId } from "../subscription"
@@ -38,30 +37,27 @@ class FeedActions {
     set((state) =>
       produce(state, (state) => {
         for (const feed of feeds) {
-          if (
-            feed.type === "feed" &&
-            feed.errorAt &&
-            new Date(feed.errorAt).getTime() > Date.now() - distanceTime
-          ) {
+          if (feed.errorAt && new Date(feed.errorAt).getTime() > Date.now() - distanceTime) {
             feed.errorAt = null
           }
           if (feed.id) {
             if (feed.owner) {
               userActions.upsert(feed.owner as UserModel)
             }
-            if (feed.type === "feed" && feed.tipUsers) {
+            if (feed.tipUsers) {
               userActions.upsert(feed.tipUsers)
             }
 
             // Not all API return these fields, so merging is needed here.
-            const optionalFields = ["owner", "tipUsers"] as const
-            optionalFields.forEach((field) => {
-              if (state.feeds[feed.id!]?.[field] && !(field in feed)) {
-                ;(feed as any)[field] = { ...state.feeds[feed.id!]?.[field] }
-              }
-            })
+            const targetFeed = state.feeds[feed.id]
+            if (targetFeed?.owner) {
+              feed.owner = { ...targetFeed.owner }
+            }
+            if (targetFeed && "tipUsers" in targetFeed && targetFeed.tipUsers) {
+              feed.tipUsers = [...targetFeed.tipUsers]
+            }
 
-            state.feeds[feed.id] = omit(feed, "feeds") as FeedOrListModel
+            state.feeds[feed.id] = omit(feed, "feeds") as FeedModel
           } else {
             // Store temp feed in memory
             const nonce = feed["nonce"] || nanoid(8)
@@ -136,8 +132,8 @@ export const getFeedById = (feedId: string): Nullable<FeedOrListRespModel> =>
   useFeedStore.getState().feeds[feedId]
 
 export const getPreferredTitle = (
-  feed?: FeedOrListRespModel | null,
-  entry?: CombinedEntryModel["entries"],
+  feed?: Pick<FeedOrListRespModel, "type" | "id" | "title"> | null,
+  entry?: Pick<CombinedEntryModel["entries"], "authorUrl"> | null,
 ) => {
   if (!feed?.id) {
     return feed?.title

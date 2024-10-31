@@ -1,8 +1,7 @@
+import { createSettingAtom } from "@follow/atoms/helper/setting.js"
 import type { GeneralSettings } from "@follow/shared/interface/settings"
 
 import { jotaiStore } from "~/lib/jotai"
-
-import { createSettingAtom } from "./helper"
 
 const createDefaultSettings = (): GeneralSettings => ({
   // App
@@ -19,10 +18,12 @@ const createDefaultSettings = (): GeneralSettings => ({
   hoverMarkUnread: true,
   renderMarkUnread: false,
   // UX
-  // autoHideFeedColumn: true,
+
   groupByDate: true,
   // Secure
   jumpOutLinkWarn: true,
+  // TTS
+  voice: "en-US-AndrewMultilingualNeural",
 })
 
 export const {
@@ -45,4 +46,5 @@ export const generalServerSyncWhiteListKeys: (keyof GeneralSettings)[] = [
   "dataPersist",
   "sendAnonymousData",
   "language",
+  "voice",
 ]

@@ -1,3 +1,8 @@
+import { getViewport, useViewport } from "@follow/components/hooks/useViewport.js"
+import { useScrollViewElement } from "@follow/components/ui/scroll-area/hooks.js"
+import { getElementTop } from "@follow/utils/dom"
+import { springScrollToElement } from "@follow/utils/scroller"
+import { cn } from "@follow/utils/utils"
 import * as HoverCard from "@radix-ui/react-hover-card"
 import { AnimatePresence, m } from "framer-motion"
 import { throttle } from "lodash-es"
@@ -13,18 +18,13 @@ import {
 } from "react"
 import { useEventCallback } from "usehooks-ts"
 
-import { getViewport, useViewport } from "~/atoms/hooks/viewport"
 import { useUISettingKey } from "~/atoms/settings/ui"
-import { getElementTop } from "~/lib/dom"
-import { springScrollToElement } from "~/lib/scroller"
-import { cn } from "~/lib/utils"
 import {
   useGetWrappedElementPosition,
   useWrappedElementPosition,
   useWrappedElementSize,
 } from "~/providers/wrapped-element-provider"
 
-import { useScrollViewElement } from "../../scroll-area/hooks"
 import { MarkdownRenderContainerRefContext } from "../context"
 import type { TocItemProps } from "./TocItem"
 import { TocItem } from "./TocItem"
@@ -42,13 +42,19 @@ export interface ITocItem {
   $heading: HTMLHeadingElement
 }
 
+interface TocProps {
+  onItemClick?: (index: number, $el: HTMLElement | null, anchorId: string) => void
+}
+
 const WiderTocStyle = {
   width: 200,
 } satisfies React.CSSProperties
-export const Toc: Component = ({ className }) => {
+export const Toc: Component<TocProps> = ({ className, onItemClick }) => {
   const markdownElement = useContext(MarkdownRenderContainerRefContext)
   const { toc, rootDepth } = useTocItems(markdownElement)
-  const { currentScrollRange, handleScrollTo } = useScrollTracking(toc)
+  const { currentScrollRange, handleScrollTo } = useScrollTracking(toc, {
+    onItemClick,
+  })
 
   const renderContentElementPosition = useWrappedElementPosition()
   const renderContentElementSize = useWrappedElementSize()
@@ -269,7 +275,7 @@ const useTocItems = (markdownElement: HTMLElement | null) => {
   return { toc, rootDepth }
 }
 
-const useScrollTracking = (toc: ITocItem[]) => {
+const useScrollTracking = (toc: ITocItem[], options: Pick<TocProps, "onItemClick">) => {
   const scrollContainerElement = useScrollViewElement()
   const [currentScrollRange, setCurrentScrollRange] = useState([-1, 0] as [number, number])
   const { h } = useWrappedElementSize()
@@ -361,6 +367,7 @@ const useScrollTracking = (toc: ITocItem[]) => {
 
   const handleScrollTo = useEventCallback(
     (i: number, $el: HTMLElement | null, _anchorId: string) => {
+      options.onItemClick?.(i, $el, _anchorId)
       if ($el) {
         const handle = () => {
           springScrollToElement($el, -100, scrollContainerElement!).then(() => {

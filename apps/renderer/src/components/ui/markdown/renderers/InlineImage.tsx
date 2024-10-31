@@ -1,6 +1,5 @@
+import { cn } from "@follow/utils/utils"
 import { useContext } from "react"
-
-import { cn } from "~/lib/utils"
 
 import { Media } from "../../media"
 import { MarkdownRenderActionContext } from "../context"
@@ -23,8 +22,8 @@ export const MarkdownInlineImage = (
       src={populatedUrl}
       mediaContainerClassName={cn("inline max-w-full rounded-md")}
       popper
-      className="inline"
       showFallback
+      inline
     />
   )
 }

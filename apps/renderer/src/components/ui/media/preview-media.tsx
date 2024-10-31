@@ -1,5 +1,9 @@
+import { ActionButton, MotionButtonBase } from "@follow/components/ui/button/index.js"
+import { RootPortal } from "@follow/components/ui/portal/index.js"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import type { MediaModel } from "@follow/shared/hono"
+import { stopPropagation } from "@follow/utils/dom"
+import { cn } from "@follow/utils/utils"
 import type { FC } from "react"
 import { Fragment, useCallback, useEffect, useRef, useState } from "react"
 import { Blurhash } from "react-blurhash"
@@ -12,27 +16,34 @@ import { useWindowSize } from "usehooks-ts"
 import { m } from "~/components/common/Motion"
 import { COPY_MAP } from "~/constants"
 import { tipcClient } from "~/lib/client"
-import { stopPropagation } from "~/lib/dom"
 import { replaceImgUrlIfNeed } from "~/lib/img-proxy"
-import { cn } from "~/lib/utils"
-import { EntryContent } from "~/modules/entry-content"
 
-import { ActionButton, MotionButtonBase } from "../button"
 import { microReboundPreset } from "../constants/spring"
-import { useCurrentModal } from "../modal"
-import { RootPortal } from "../portal"
+import { FixedModalCloseButton } from "../modal/components/close"
+import { useCurrentModal } from "../modal/stacked/hooks"
 import { VideoPlayer } from "./VideoPlayer"
 
 const Wrapper: Component<{
   src: string
   showActions?: boolean
-  entryId?: string
-}> = ({ children, src, showActions, entryId }) => {
+  sideContent?: React.ReactNode
+}> = ({ children, src, showActions, sideContent }) => {
   const { dismiss } = useCurrentModal()
-  const { t } = useTranslation(["shortcuts", "external"])
+  const { t } = useTranslation(["shortcuts", "common"])
 
   return (
     <div className="center relative size-full px-20 pb-8 pt-10" onClick={dismiss}>
+      <m.div
+        onFocusCapture={stopPropagation}
+        initial={true}
+        exit={{
+          opacity: 0,
+        }}
+        className="fixed right-3 flex items-center gap-4 safe-inset-top-2"
+      >
+        <FixedModalCloseButton onClick={dismiss} />
+      </m.div>
+
       <m.div
         className="center flex size-full"
         initial={{ scale: 0.94, opacity: 0 }}
@@ -43,20 +54,24 @@ const Wrapper: Component<{
         <div
           className={cn(
             "relative flex h-full w-auto overflow-hidden",
-            entryId ? "min-w-96 items-center justify-center rounded-l-xl bg-native" : "rounded-xl",
+            sideContent
+              ? "min-w-96 items-center justify-center rounded-l-xl bg-native"
+              : "rounded-xl",
           )}
         >
           {children}
-          <RootPortal to={entryId ? null : undefined}>
+          <RootPortal to={sideContent ? null : undefined}>
             <div
-              className="pointer-events-auto absolute bottom-4 right-4 z-[99] flex gap-3 text-theme-vibrancyFg dark:text-white/70 [&_button]:hover:text-theme-vibrancyFg dark:[&_button]:hover:text-white"
+              className={
+                "pointer-events-auto absolute bottom-4 right-4 z-[99] flex gap-3 text-theme-vibrancyFg dark:text-white/70 [&_button]:hover:text-theme-vibrancyFg dark:[&_button]:hover:text-white"
+              }
               onClick={stopPropagation}
             >
               {showActions && (
                 <Fragment>
                   {IN_ELECTRON && (
                     <ActionButton
-                      tooltip={t("external:header.download")}
+                      tooltip={t("common:words.download")}
                       onClick={() => {
                         tipcClient?.download(src)
                       }}
@@ -77,12 +92,12 @@ const Wrapper: Component<{
             </div>
           </RootPortal>
         </div>
-        {entryId && (
+        {!!sideContent && (
           <div
             className="box-border flex h-full w-[400px] min-w-0 shrink-0 flex-col rounded-r-xl bg-theme-background px-2 pt-1"
             onClick={stopPropagation}
           >
-            <EntryContent entryId={entryId} noMedia compact />
+            {sideContent}
           </div>
         )}
       </m.div>
@@ -96,8 +111,8 @@ export interface PreviewMediaProps extends MediaModel {
 export const PreviewMediaContent: FC<{
   media: PreviewMediaProps[]
   initialIndex?: number
-  entryId?: string
-}> = ({ media, initialIndex = 0, entryId }) => {
+  children?: React.ReactNode
+}> = ({ media, initialIndex = 0, children }) => {
   const [currentMedia, setCurrentMedia] = useState(media[initialIndex])
   const [currentSlideIndex, setCurrentSlideIndex] = useState(initialIndex)
   const swiperRef = useRef<SwiperRef>(null)
@@ -115,15 +130,16 @@ export const PreviewMediaContent: FC<{
   if (media.length === 1) {
     const src = media[0].url
     const { type } = media[0]
+    const isVideo = type === "video"
     return (
-      <Wrapper src={src} showActions={type !== "video"} entryId={entryId}>
-        {type === "video" ? (
+      <Wrapper src={src} showActions={!isVideo} sideContent={children}>
+        {isVideo ? (
           <VideoPlayer
             src={src}
             controls
             autoPlay
             muted
-            className={cn("h-full w-auto object-contain", entryId && "rounded-l-xl")}
+            className={cn("h-full w-auto object-contain", !!children && "rounded-l-xl")}
             onClick={stopPropagation}
           />
         ) : (
@@ -141,8 +157,9 @@ export const PreviewMediaContent: FC<{
       </Wrapper>
     )
   }
+  const isVideo = currentMedia.type === "video"
   return (
-    <Wrapper src={currentMedia.url} showActions={currentMedia.type !== "video"} entryId={entryId}>
+    <Wrapper src={currentMedia.url} showActions={!isVideo} sideContent={children}>
       <Swiper
         ref={swiperRef}
         loop
@@ -188,13 +205,21 @@ export const PreviewMediaContent: FC<{
 
         {showActions && (
           <div>
-            <div className="absolute bottom-4 left-4 text-sm tabular-nums text-white/60 animate-in fade-in-0 slide-in-from-bottom-6">
+            <div
+              className={cn(
+                "absolute left-4 text-sm tabular-nums text-white/60 animate-in fade-in-0 slide-in-from-bottom-6",
+                isVideo ? "bottom-12" : "bottom-4",
+              )}
+            >
               {currentSlideIndex + 1} / {media.length}
             </div>
             <div
               tabIndex={-1}
               onClick={stopPropagation}
-              className="center absolute bottom-4 left-1/2 z-[99] h-6 -translate-x-1/2 gap-2 rounded-full bg-neutral-700/90 px-4 duration-200 animate-in fade-in-0 slide-in-from-bottom-6"
+              className={cn(
+                "center absolute left-1/2 z-[99] h-6 -translate-x-1/2 gap-2 rounded-full bg-neutral-700/90 px-4 duration-200 animate-in fade-in-0 slide-in-from-bottom-6",
+                isVideo ? "bottom-12" : "bottom-4",
+              )}
             >
               {Array.from({ length: media.length })
                 .fill(0)
@@ -301,14 +326,14 @@ const FallbackableImage: FC<
     <div className={cn("center flex size-full flex-col", containerClassName)}>
       {!isAllError && (
         <div
-          className={cn("relative", width < height && "h-full")}
+          className={cn("relative max-h-full", width <= height && "h-full")}
           style={{
             // px-20 pb-8 pt-10
             width:
               width && height && width > height
-                ? Math.min((windowHeight - 32 - 40) * (width / height), width)
+                ? `${Math.min((windowHeight - 32 - 40) * (width / height), width)}px`
                 : undefined,
-            maxWidth: width > height ? windowWidth - 80 - 80 - 400 : undefined,
+            maxWidth: width > height ? `${windowWidth - 80 - 80 - 400}px` : undefined,
           }}
         >
           <img

@@ -1,4 +1,9 @@
+import { ActionButton } from "@follow/components/ui/button/index.js"
+import { Routes, views } from "@follow/constants"
+import { useTypeScriptHappyCallback } from "@follow/hooks"
 import { useSubscribeElectronEvent } from "@follow/shared/event"
+import { stopPropagation } from "@follow/utils/dom"
+import { clamp, cn } from "@follow/utils/utils"
 import { useWheel } from "@use-gesture/react"
 import { AnimatePresence, m } from "framer-motion"
 import { Lethargy } from "lethargy"
@@ -9,21 +14,18 @@ import { useTranslation } from "react-i18next"
 
 import { useUISettingKey } from "~/atoms/settings/ui"
 import { useSidebarActiveView } from "~/atoms/sidebar"
-import { ActionButton } from "~/components/ui/button"
-import { HotKeyScopeMap, views } from "~/constants"
+import { HotKeyScopeMap } from "~/constants"
 import { shortcuts } from "~/constants/shortcuts"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { useReduceMotion } from "~/hooks/biz/useReduceMotion"
 import { getRouteParams } from "~/hooks/biz/useRouteParams"
 import { useAuthQuery } from "~/hooks/common"
-import { stopPropagation } from "~/lib/dom"
-import { Routes } from "~/lib/enum"
-import { clamp, cn } from "~/lib/utils"
 import { Queries } from "~/queries"
 import { useSubscriptionStore } from "~/store/subscription"
 import { useFeedUnreadStore } from "~/store/unread"
 
 import { WindowUnderBlur } from "../../components/ui/background"
+import { getSelectedFeedIds, setSelectedFeedIds } from "./atom"
 import { FeedColumnHeader } from "./header"
 import { FeedList } from "./list"
 
@@ -190,7 +192,16 @@ export function FeedColumn({ children, className }: PropsWithChildren<{ classNam
           </ActionButton>
         ))}
       </div>
-      <div className="relative flex size-full overflow-hidden" ref={carouselRef}>
+      <div
+        className="relative flex size-full overflow-hidden"
+        ref={carouselRef}
+        onPointerDown={useTypeScriptHappyCallback((e) => {
+          if (!(e.target instanceof HTMLElement) || !e.target.closest("[data-feed-id]")) {
+            const nextSelectedFeedIds = getSelectedFeedIds()
+            setSelectedFeedIds(nextSelectedFeedIds.length === 0 ? nextSelectedFeedIds : [])
+          }
+        }, [])}
+      >
         <SwipeWrapper active={active}>
           {views.map((item, index) => (
             <section key={item.name} className="h-full w-feed-col shrink-0 snap-center">

@@ -1,12 +1,9 @@
+import { initializeDayjs } from "@follow/components/dayjs"
 import { registerGlobalContext } from "@follow/shared/bridge"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import { env } from "@follow/shared/env"
 import { authConfigManager } from "@hono/auth-js/react"
 import { repository } from "@pkg"
-import dayjs from "dayjs"
-import duration from "dayjs/plugin/duration"
-import localizedFormat from "dayjs/plugin/localizedFormat"
-import relativeTime from "dayjs/plugin/relativeTime"
 import { enableMapSet } from "immer"
 
 import { isElectronBuild } from "~/constants"
@@ -53,6 +50,7 @@ export const initializeApp = async () => {
     basePath: "/auth",
     credentials: "include",
   })
+  initializeDayjs()
 
   // Set Environment
   document.documentElement.dataset.buildType = isElectronBuild ? "electron" : "web"
@@ -71,11 +69,6 @@ export const initializeApp = async () => {
   })
 
   apm("migration", doMigration)
-
-  // Initialize dayjs
-  dayjs.extend(duration)
-  dayjs.extend(relativeTime)
-  dayjs.extend(localizedFormat)
 
   // Enable Map/Set in immer
   enableMapSet()

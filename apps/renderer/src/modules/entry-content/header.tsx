@@ -1,4 +1,9 @@
+import { ActionButton } from "@follow/components/ui/button/index.js"
+import { DividerVertical } from "@follow/components/ui/divider/index.js"
+import { FeedViewType, views } from "@follow/constants"
+import type { CombinedEntryModel } from "@follow/models/types"
 import { IN_ELECTRON } from "@follow/shared/constants"
+import { cn } from "@follow/utils/utils"
 import { Slot } from "@radix-ui/react-slot"
 import { noop } from "foxact/noop"
 import { AnimatePresence, m } from "framer-motion"
@@ -12,16 +17,11 @@ import {
   useEntryInReadabilityStatus,
 } from "~/atoms/readability"
 import { useUISettingKey } from "~/atoms/settings/ui"
-import { ActionButton } from "~/components/ui/button"
-import { DividerVertical } from "~/components/ui/divider"
-import { views } from "~/constants"
 import { shortcuts } from "~/constants/shortcuts"
 import { useEntryActions, useEntryReadabilityToggle } from "~/hooks/biz/useEntryActions"
+import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { tipcClient } from "~/lib/client"
-import { FeedViewType } from "~/lib/enum"
 import { parseHtml } from "~/lib/parse-html"
-import { cn } from "~/lib/utils"
-import type { CombinedEntryModel } from "~/models"
 import type { FlatEntryModel } from "~/store/entry"
 import { useEntry } from "~/store/entry/hooks"
 import { useFeedById } from "~/store/feed"
@@ -42,10 +42,12 @@ function EntryHeaderImpl({
 }) {
   const entry = useEntry(entryId)
 
+  const listId = useRouteParamsSelector((s) => s.listId)
   const { items } = useEntryActions({
     view,
     entry,
     type: "toolbar",
+    inList: !!listId,
   })
 
   const entryTitleMeta = useEntryTitleMeta()
@@ -60,7 +62,7 @@ function EntryHeaderImpl({
   return (
     <div
       className={cn(
-        "relative flex min-w-0 items-center justify-between gap-3 overflow-hidden text-lg text-zinc-500",
+        "relative flex min-w-0 items-center justify-between gap-3 overflow-hidden text-lg text-zinc-500 duration-200",
         shouldShowMeta && "border-b border-border",
         className,
       )}

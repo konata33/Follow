@@ -1,3 +1,5 @@
+import { FeedViewType, views } from "@follow/constants"
+import { cn } from "@follow/utils/utils"
 import { useWheel } from "@use-gesture/react"
 import { easeOut } from "framer-motion"
 import type { FC, PropsWithChildren } from "react"
@@ -8,12 +10,13 @@ import { useParams } from "react-router-dom"
 import { useUISettingKey } from "~/atoms/settings/ui"
 import { useFeedColumnShow, useFeedColumnTempShow } from "~/atoms/sidebar"
 import { m } from "~/components/common/Motion"
-import { ActionButton } from "~/components/ui/button"
-import { HotKeyScopeMap, ROUTE_ENTRY_PENDING, views } from "~/constants"
+import { FixedModalCloseButton } from "~/components/ui/modal/components/close"
+import { HotKeyScopeMap, ROUTE_ENTRY_PENDING, ROUTE_FEED_PENDING } from "~/constants"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
-import { useRouteView } from "~/hooks/biz/useRouteParams"
-import { cn } from "~/lib/utils"
+import { useRouteParams, useRouteView } from "~/hooks/biz/useRouteParams"
+import { EntryPlaceholderDaily } from "~/modules/ai/ai-daily/EntryPlaceholderDaily"
 import { EntryContent } from "~/modules/entry-content"
+import { EntryPlaceholderLogo } from "~/modules/entry-content/components/EntryPlaceholderLogo"
 import { AppLayoutGridContainerProvider } from "~/providers/app-grid-layout-container-provider"
 
 export const Component = () => {
@@ -32,16 +35,17 @@ export const Component = () => {
   useHotkeys(
     "Escape",
     () => {
-      if (settingWideMode) {
-        navigate({ entryId: null })
-      }
+      navigate({ entryId: null })
     },
     {
-      enabled: showEntryContent,
+      enabled: showEntryContent && settingWideMode,
       scopes: HotKeyScopeMap.Home,
       preventDefault: true,
     },
   )
+
+  const { feedId } = useRouteParams()
+  const enableEntryWideMode = useUISettingKey("wideMode")
 
   if (!showEntryContent) {
     return null
@@ -51,33 +55,34 @@ export const Component = () => {
     <AppLayoutGridContainerProvider>
       <EntryGridContainer showEntryContent={showEntryContent} wideMode={wideMode}>
         {wideMode && (
-          // Close button
-          <ActionButton
-            className={cn(
-              "absolute left-3 top-3 z-10 duration-200",
-              shouldHeaderPaddingLeft
-                ? "left-[calc(theme(width.3)+theme(width.feed-col))]"
-                : "left-3",
-            )}
-            tooltip="Close"
-            shortcut="Escape"
-            disableTriggerShortcut
+          <FixedModalCloseButton
+            className="absolute left-3 top-3 z-10"
             onClick={() => navigate({ entryId: null })}
-          >
-            <i className="i-mgc-close-cute-re size-5" />
-          </ActionButton>
+          />
         )}
-
-        <EntryContent
-          entryId={realEntryId}
-          classNames={{
-            header: shouldHeaderPaddingLeft
-              ? "ml-[calc(theme(width.feed-col)+theme(width.8))]"
-              : wideMode
-                ? "ml-8"
-                : "",
-          }}
-        />
+        {realEntryId ? (
+          <EntryContent
+            entryId={realEntryId}
+            classNames={{
+              header: shouldHeaderPaddingLeft
+                ? "ml-[calc(theme(width.feed-col)+theme(width.8))]"
+                : wideMode
+                  ? "ml-12"
+                  : "",
+            }}
+          />
+        ) : !enableEntryWideMode ? (
+          <m.div
+            className="center size-full flex-col"
+            initial={{ opacity: 0.01, y: 300 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <EntryPlaceholderLogo />
+            {feedId === ROUTE_FEED_PENDING && view === FeedViewType.Articles && (
+              <EntryPlaceholderDaily view={view} />
+            )}
+          </m.div>
+        ) : null}
       </EntryGridContainer>
     </AppLayoutGridContainerProvider>
   )

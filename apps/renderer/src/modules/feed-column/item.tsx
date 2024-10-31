@@ -1,29 +1,35 @@
+import { OouiUserAnonymous } from "@follow/components/icons/OouiUserAnonymous.jsx"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipPortal,
+  TooltipTrigger,
+} from "@follow/components/ui/tooltip/index.jsx"
+import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/index.js"
+import type { FeedViewType } from "@follow/constants"
+import { useAnyPointDown } from "@follow/hooks"
+import { nextFrame } from "@follow/utils/dom"
+import { UrlBuilder } from "@follow/utils/url-builder"
+import { cn } from "@follow/utils/utils"
 import dayjs from "dayjs"
 import { memo, useCallback, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { getMainContainerElement } from "~/atoms/dom"
-import { FeedCertification } from "~/components/feed-certification"
-import { FeedIcon } from "~/components/feed-icon"
-import { OouiUserAnonymous } from "~/components/icons/OouiUserAnonymous"
-import { Tooltip, TooltipContent, TooltipPortal, TooltipTrigger } from "~/components/ui/tooltip"
-import { EllipsisHorizontalTextWithTooltip } from "~/components/ui/typography"
 import { useFeedActions, useInboxActions, useListActions } from "~/hooks/biz/useFeedActions"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { useAnyPointDown } from "~/hooks/common"
-import { nextFrame } from "~/lib/dom"
-import type { FeedViewType } from "~/lib/enum"
 import { getNewIssueUrl } from "~/lib/issues"
 import { showNativeMenu } from "~/lib/native-menu"
-import { UrlBuilder } from "~/lib/url-builder"
-import { cn } from "~/lib/utils"
+import { FeedIcon } from "~/modules/feed/feed-icon"
+import { FeedTitle } from "~/modules/feed/feed-title"
 import { getPreferredTitle, useFeedById } from "~/store/feed"
 import { useInboxById } from "~/store/inbox"
 import { useListById } from "~/store/list"
 import { subscriptionActions, useSubscriptionByFeedId } from "~/store/subscription"
 import { useFeedUnreadStore } from "~/store/unread"
 
+import { useSelectedFeedIds } from "./atom"
 import { feedColumnStyles } from "./styles"
 import { UnreadNumber } from "./unread-number"
 
@@ -36,10 +42,29 @@ const FeedItemImpl = ({ view, feedId, className }: FeedItemProps) => {
   const { t } = useTranslation()
   const subscription = useSubscriptionByFeedId(feedId)
   const navigate = useNavigateEntry()
-  const feed = useFeedById(feedId)
+  const feed = useFeedById(feedId, (feed) => {
+    return {
+      type: feed.type,
+      id: feed.id,
+      title: feed.title,
+      errorAt: feed.errorAt,
+      errorMessage: feed.errorMessage,
+      url: feed.url,
+      image: feed.image,
+      siteUrl: feed.siteUrl,
+    }
+  })
 
-  const handleNavigate: React.MouseEventHandler<HTMLDivElement> = useCallback(
+  const [selectedFeedIds, setSelectedFeedIds] = useSelectedFeedIds()
+
+  const handleClick: React.MouseEventHandler<HTMLDivElement> = useCallback(
     (e) => {
+      if (e.metaKey) {
+        return
+      } else {
+        setSelectedFeedIds([])
+      }
+
       e.stopPropagation()
       if (view === undefined) return
       navigate({
@@ -52,18 +77,22 @@ const FeedItemImpl = ({ view, feedId, className }: FeedItemProps) => {
         getMainContainerElement()?.focus()
       })
     },
-    [feedId, navigate, view, feed?.type],
+    [feedId, navigate, setSelectedFeedIds, view],
   )
 
   const feedUnread = useFeedUnreadStore((state) => state.data[feedId] || 0)
 
   const isActive = useRouteParamsSelector((routerParams) => routerParams.feedId === feedId)
 
-  const { items } = useFeedActions({ feedId, view })
+  const { items } = useFeedActions({
+    feedIds: selectedFeedIds,
+    feedId,
+    view,
+  })
 
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   useAnyPointDown(() => {
-    setIsContextMenuOpen(false)
+    isContextMenuOpen && setIsContextMenuOpen(false)
   })
   if (!feed) return null
 
@@ -73,14 +102,14 @@ const FeedItemImpl = ({ view, feedId, className }: FeedItemProps) => {
     <>
       <div
         data-feed-id={feedId}
-        data-active={isActive || isContextMenuOpen}
+        data-active={isActive || isContextMenuOpen || selectedFeedIds.includes(feedId)}
         className={cn(
           "flex w-full cursor-menu items-center justify-between rounded-md py-[2px] pr-2.5 text-sm font-medium leading-loose",
           feedColumnStyles.item,
           isFeed ? "py-[2px]" : "py-1.5",
           className,
         )}
-        onClick={handleNavigate}
+        onClick={handleClick}
         onDoubleClick={() => {
           window.open(UrlBuilder.shareFeed(feedId, view), "_blank")
         }}
@@ -110,7 +139,17 @@ const FeedItemImpl = ({ view, feedId, className }: FeedItemProps) => {
               },
             )
           }
-          showNativeMenu(nextItems, e)
+          showNativeMenu(
+            nextItems.filter(
+              (item) =>
+                selectedFeedIds.length === 0 ||
+                (typeof item === "object" &&
+                  item !== null &&
+                  "supportMultipleSelection" in item &&
+                  item.supportMultipleSelection),
+            ),
+            e,
+          )
         }}
       >
         <div
@@ -120,8 +159,7 @@ const FeedItemImpl = ({ view, feedId, className }: FeedItemProps) => {
           )}
         >
           <FeedIcon fallback feed={feed} size={16} />
-          <div className="truncate">{getPreferredTitle(feed)}</div>
-          {isFeed && <FeedCertification feed={feed} className="text-[15px]" />}
+          <FeedTitle feed={feed} />
           {isFeed && feed.errorAt && (
             <Tooltip delayDuration={300}>
               <TooltipTrigger asChild>
@@ -179,7 +217,7 @@ const ListItemImpl: Component<{
 
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   useAnyPointDown(() => {
-    setIsContextMenuOpen(false)
+    isContextMenuOpen && setIsContextMenuOpen(false)
   })
   const subscription = useSubscriptionByFeedId(listId)
   const navigate = useNavigateEntry()
@@ -262,7 +300,7 @@ const InboxItemImpl: Component<{
 
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   useAnyPointDown(() => {
-    setIsContextMenuOpen(false)
+    isContextMenuOpen && setIsContextMenuOpen(false)
   })
   const navigate = useNavigateEntry()
   const handleNavigate = useCallback(

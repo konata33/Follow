@@ -1,7 +1,7 @@
+import { FeedViewType } from "@follow/constants"
 import { atom } from "jotai"
 
 import { getRouteParams } from "~/hooks/biz/useRouteParams"
-import { FeedViewType } from "~/lib/enum"
 import { createAtomHooks } from "~/lib/jotai"
 
 const defaultFeedView = FeedViewType.Articles
@@ -48,9 +48,14 @@ viewAtom.onMount = () => {
     setSidebarActiveView(view)
   }
 }
-export const [, , useFeedColumnShow, , getFeedColumnShow, setFeedColumnShow] = createAtomHooks(
-  atom(true),
-)
+export const [
+  internal_feedColumnShowAtom,
+  ,
+  useFeedColumnShow,
+  ,
+  getFeedColumnShow,
+  setFeedColumnShow,
+] = createAtomHooks(atom(true))
 
 export const [, , useFeedColumnTempShow, , getFeedColumnTempShow, setFeedColumnTempShow] =
   createAtomHooks(atom(false))

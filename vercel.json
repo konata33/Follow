@@ -17,11 +17,23 @@
       "destination": "https://follow-external-ssr.vercel.app/og/:path*"
     },
     {
-      "source": "/external-dist/:path*",
-      "destination": "https://follow-external-ssr.vercel.app/:path*"
+      "source": "/login",
+      "destination": "https://follow-external-ssr.vercel.app/login"
     },
     {
-      "source": "/((?!assets|vendor|locales/).*)",
+      "source": "/redirect",
+      "destination": "https://follow-external-ssr.vercel.app/redirect"
+    },
+    {
+      "source": "/external-dist/:path*",
+      "destination": "https://follow-external-ssr.vercel.app/external-dist/:path*"
+    },
+    {
+      "source": "/dist-external/:path*",
+      "destination": "https://follow-external-ssr.vercel.app/dist-external/:path*"
+    },
+    {
+      "source": "/((?!assets|vendor|locales|dist-external|external-dist/).*)",
       "destination": "/index.html"
     }
   ],

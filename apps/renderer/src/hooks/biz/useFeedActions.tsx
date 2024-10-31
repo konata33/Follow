@@ -1,14 +1,16 @@
+import { Button } from "@follow/components/ui/button/index.js"
+import type { FeedViewType } from "@follow/constants"
 import { IN_ELECTRON } from "@follow/shared/constants"
 import { env } from "@follow/shared/env"
+import { UrlBuilder } from "@follow/utils/url-builder"
+import { isBizId } from "@follow/utils/utils"
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 
 import { whoami } from "~/atoms/user"
-import { useModalStack } from "~/components/ui/modal"
-import type { FeedViewType } from "~/lib/enum"
+import { useModalStack } from "~/components/ui/modal/stacked/hooks"
 import type { NativeMenuItem, NullableNativeMenuItem } from "~/lib/native-menu"
-import { UrlBuilder } from "~/lib/url-builder"
-import { isBizId } from "~/lib/utils"
+import { useBoostModal } from "~/modules/boost/hooks"
 import { useFeedClaimModal } from "~/modules/claim"
 import { FeedForm } from "~/modules/discover/feed-form"
 import { InboxForm } from "~/modules/discover/inbox-form"
@@ -28,18 +30,45 @@ import { useNavigateEntry } from "./useNavigateEntry"
 import { getRouteParams } from "./useRouteParams"
 import { useDeleteSubscription } from "./useSubscriptionActions"
 
+const ConfirmDestroyModalContent = ({ onConfirm }: { onConfirm: () => void }) => {
+  const { t } = useTranslation()
+
+  return (
+    <div className="w-[540px]">
+      <div className="mb-4">
+        <i className="i-mingcute-warning-fill -mb-1 mr-1 size-5 text-red-500" />
+        {t("sidebar.feed_actions.unfollow_feed_many_warning")}
+      </div>
+      <div className="flex justify-end">
+        <Button className="bg-red-600" onClick={onConfirm}>
+          {t("words.confirm")}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export const useFeedActions = ({
   feedId,
+  feedIds,
   view,
   type,
 }: {
   feedId: string
+  feedIds?: string[]
   view?: number
   type?: "feedList" | "entryList"
 }) => {
   const { t } = useTranslation()
-  const feed = useFeedById(feedId)
-  const isInbox = feed?.type === "inbox"
+  const feed = useFeedById(feedId, (feed) => {
+    return {
+      type: feed.type,
+      ownerUserId: feed.ownerUserId,
+      id: feed.id,
+    }
+  })
+  const inbox = useInboxById(feedId)
+  const isInbox = !!inbox
   const subscription = useSubscriptionByFeedId(feedId)
   const { present } = useModalStack()
   const deleteSubscription = useDeleteSubscription({})
@@ -52,11 +81,15 @@ export const useFeedActions = ({
 
   const { mutateAsync: addFeedToListMutation } = useAddFeedToFeedList()
   const { mutateAsync: removeFeedFromListMutation } = useRemoveFeedFromFeedList()
+  const openBoostModal = useBoostModal()
 
   const listByView = useOwnedList(view!)
 
+  const isMultipleSelection = feedIds && feedIds.length > 0
+
   const items = useMemo(() => {
-    if (!feed) return []
+    const related = feed || inbox
+    if (!related) return []
 
     const items: NullableNativeMenuItem[] = [
       {
@@ -64,11 +97,15 @@ export const useFeedActions = ({
         label: t("sidebar.feed_actions.mark_all_as_read"),
         shortcut: "Meta+Shift+A",
         disabled: isEntryList,
-        click: () => subscriptionActions.markReadByFeedIds({ feedIds: [feedId] }),
+        click: () =>
+          subscriptionActions.markReadByFeedIds({
+            feedIds: isMultipleSelection ? feedIds : [feedId],
+          }),
+        supportMultipleSelection: true,
       },
-      !feed.ownerUserId &&
-        !!isBizId(feed.id) &&
-        feed.type === "feed" && {
+      !related.ownerUserId &&
+        !!isBizId(related.id) &&
+        related.type === "feed" && {
           type: "text" as const,
           label: isEntryList
             ? t("sidebar.feed_actions.claim_feed")
@@ -78,7 +115,7 @@ export const useFeedActions = ({
             claimFeed()
           },
         },
-      ...(feed.ownerUserId === whoami()?.id
+      ...(related.ownerUserId === whoami()?.id
         ? [
             {
               type: "text" as const,
@@ -87,6 +124,13 @@ export const useFeedActions = ({
           ]
         : []),
       {
+        type: "text" as const,
+        label: t("words.boost"),
+        click: () => {
+          openBoostModal(feedId)
+        },
+      },
+      {
         type: "separator" as const,
         disabled: isEntryList,
       },
@@ -94,6 +138,7 @@ export const useFeedActions = ({
         type: "text" as const,
         label: t("sidebar.feed_column.context_menu.add_feeds_to_list"),
         disabled: isInbox,
+        supportMultipleSelection: true,
         submenu: [
           ...listByView.map((list) => {
             const isIncluded = list.feedIds.includes(feedId)
@@ -102,6 +147,14 @@ export const useFeedActions = ({
               type: "text" as const,
               checked: isIncluded,
               click() {
+                if (isMultipleSelection) {
+                  addFeedToListMutation({
+                    feedIds,
+                    listId: list.id,
+                  })
+                  return
+                }
+
                 if (!isIncluded) {
                   addFeedToListMutation({
                     feedId,
@@ -148,12 +201,31 @@ export const useFeedActions = ({
       },
       {
         type: "text" as const,
-        label: isEntryList
-          ? t("sidebar.feed_actions.unfollow_feed")
-          : t("sidebar.feed_actions.unfollow"),
+        label: isMultipleSelection
+          ? t("sidebar.feed_actions.unfollow_feed_many")
+          : isEntryList
+            ? t("sidebar.feed_actions.unfollow_feed")
+            : t("sidebar.feed_actions.unfollow"),
         shortcut: "Meta+Backspace",
         disabled: isInbox,
-        click: () => deleteSubscription.mutate(subscription),
+        supportMultipleSelection: true,
+        click: () => {
+          if (isMultipleSelection) {
+            present({
+              title: t("sidebar.feed_actions.unfollow_feed_many_confirm"),
+              content: ({ dismiss }) => (
+                <ConfirmDestroyModalContent
+                  onConfirm={() => {
+                    deleteSubscription.mutate({ feedIdList: feedIds })
+                    dismiss()
+                  }}
+                />
+              ),
+            })
+            return
+          }
+          deleteSubscription.mutate({ subscription })
+        },
       },
       {
         type: "text" as const,
@@ -221,11 +293,16 @@ export const useFeedActions = ({
     return items
   }, [
     feed,
+    inbox,
     t,
     isEntryList,
+    isInbox,
     listByView,
+    isMultipleSelection,
     feedId,
+    feedIds,
     claimFeed,
+    openBoostModal,
     addFeedToListMutation,
     removeFeedFromListMutation,
     present,
@@ -276,7 +353,7 @@ export const useListActions = ({ listId, view }: { listId: string; view: FeedVie
         type: "text" as const,
         label: t("sidebar.feed_actions.unfollow"),
         shortcut: "Meta+Backspace",
-        click: () => deleteSubscription(subscription),
+        click: () => deleteSubscription({ subscription }),
       },
       {
         type: "text" as const,

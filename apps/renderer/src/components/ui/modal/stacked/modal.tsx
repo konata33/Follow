@@ -1,3 +1,9 @@
+import { Divider } from "@follow/components/ui/divider/index.js"
+import { RootPortalProvider } from "@follow/components/ui/portal/provider.js"
+import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/index.js"
+import { useRefValue } from "@follow/hooks"
+import { nextFrame, preventDefault, stopPropagation } from "@follow/utils/dom"
+import { cn, getOS } from "@follow/utils/utils"
 import * as Dialog from "@radix-ui/react-dialog"
 import type { BoundingBox } from "framer-motion"
 import { produce } from "immer"
@@ -24,13 +30,8 @@ import { SafeFragment } from "~/components/common/Fragment"
 import { m } from "~/components/common/Motion"
 import { ErrorComponentType } from "~/components/errors/enum"
 import { ElECTRON_CUSTOM_TITLEBAR_HEIGHT, isElectronBuild } from "~/constants"
-import { useRefValue, useSwitchHotKeyScope } from "~/hooks/common"
-import { nextFrame, stopPropagation } from "~/lib/dom"
-import { cn, getOS } from "~/lib/utils"
+import { useSwitchHotKeyScope } from "~/hooks/common"
 
-import { Divider } from "../../divider"
-import { RootPortalProvider } from "../../portal/provider"
-import { EllipsisHorizontalTextWithTooltip } from "../../typography"
 import { modalStackAtom } from "./atom"
 import { MODAL_STACK_Z_INDEX, modalMontionConfig } from "./constants"
 import type { CurrentModalContentProps, ModalActionsInternal } from "./context"
@@ -38,6 +39,7 @@ import { CurrentModalContext, CurrentModalStateContext } from "./context"
 import { useModalAnimate } from "./internal/use-animate"
 import { useModalResizeAndDrag } from "./internal/use-drag"
 import { useModalSelect } from "./internal/use-select"
+import { useModalSubscriber } from "./internal/use-subscriber"
 import { ModalOverlay } from "./overlay"
 import type { ModalOverlayOptions, ModalProps } from "./types"
 
@@ -150,6 +152,7 @@ export const ModalInternal = memo(
       }),
       [close, getIndex, item.id, setStack],
     )
+    useModalSubscriber(item.id, ModalProps)
 
     const ModalContextProps = useMemo<CurrentModalContentProps>(
       () => ({
@@ -233,7 +236,12 @@ export const ModalInternal = memo(
             <Dialog.Portal>
               {Overlay}
               <Dialog.DialogTitle className="sr-only">{title}</Dialog.DialogTitle>
-              <Dialog.Content asChild aria-describedby={undefined} onOpenAutoFocus={openAutoFocus}>
+              <Dialog.Content
+                asChild
+                aria-describedby={undefined}
+                onPointerDownOutside={(event) => event.preventDefault()}
+                onOpenAutoFocus={openAutoFocus}
+              >
                 <div
                   ref={setEdgeElementRef}
                   className={cn(
@@ -278,7 +286,13 @@ export const ModalInternal = memo(
         <Dialog.Root modal={modal} open onOpenChange={onClose}>
           <Dialog.Portal>
             {Overlay}
-            <Dialog.Content asChild aria-describedby={undefined} onOpenAutoFocus={openAutoFocus}>
+            <Dialog.Content
+              asChild
+              aria-describedby={undefined}
+              // @ts-expect-error
+              onPointerDownOutside={preventDefault}
+              onOpenAutoFocus={openAutoFocus}
+            >
               <div
                 ref={setEdgeElementRef}
                 className={cn(
@@ -359,7 +373,7 @@ export const ModalInternal = memo(
                     </div>
                     <Divider className="my-2 shrink-0 border-slate-200 opacity-80 dark:border-neutral-800" />
 
-                    <div className="min-h-0 shrink grow overflow-auto px-4 py-2">
+                    <div className="-mx-2 min-h-0 shrink grow overflow-auto px-6 py-2">
                       <ModalContext modalContextProps={ModalContextProps} isTop={!!isTop}>
                         {finalChildren}
                       </ModalContext>

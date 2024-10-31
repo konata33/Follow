@@ -1,3 +1,11 @@
+import { FeedViewType } from "@follow/constants"
+import type {
+  FeedModel,
+  InboxModel,
+  ListModelPoplutedFeeds,
+  SubscriptionModel,
+} from "@follow/models/types"
+import { capitalizeFirstLetter } from "@follow/utils/utils"
 import { produce } from "immer"
 import { omit } from "lodash-es"
 import { parse } from "tldts"
@@ -6,9 +14,7 @@ import { whoami } from "~/atoms/user"
 import { ROUTE_FEED_IN_LIST } from "~/constants"
 import { runTransactionInScope } from "~/database"
 import { apiClient } from "~/lib/api-fetch"
-import { FeedViewType } from "~/lib/enum"
-import { capitalizeFirstLetter } from "~/lib/utils"
-import type { FeedModel, InboxModel, ListModelPoplutedFeeds, SubscriptionModel } from "~/models"
+import { updateFeedBoostStatus } from "~/modules/boost/atom"
 import { SubscriptionService } from "~/services"
 
 import { entryActions } from "../entry"
@@ -173,7 +179,12 @@ class SubscriptionActions {
       } else if ("inboxes" in subscription) {
         inboxes.push(subscription.inboxes)
       }
+
+      if ("boost" in subscription) {
+        updateFeedBoostStatus(subscription.feedId, subscription.boost.boosters.length > 0)
+      }
     }
+
     this.updateCategoryOpenState(transformedData.filter((s) => s.category || s.defaultCategory))
     feedActions.upsertMany(feeds)
     listActions.upsertMany(lists)
@@ -381,6 +392,36 @@ class SubscriptionActions {
           .then(() => feed),
       () => SubscriptionService.removeSubscription(whoami()!.id, feedId),
     ).then(() => feed)
+  }
+
+  async unfollowMany(feedIdList: string[]) {
+    for (const feedId of feedIdList) {
+      // Remove feed and subscription
+      set((state) =>
+        produce(state, (draft) => {
+          delete draft.data[feedId]
+          for (const view in draft.feedIdByView) {
+            const currentViewFeedIds = draft.feedIdByView[view] as string[]
+            currentViewFeedIds.splice(currentViewFeedIds.indexOf(feedId), 1)
+          }
+        }),
+      )
+
+      // Remove feed's entries
+      entryActions.clearByFeedId(feedId)
+      // Clear feed's unread count
+      feedUnreadActions.updateByFeedId(feedId, 0)
+    }
+
+    return doMutationAndTransaction(
+      () =>
+        apiClient.subscriptions.$delete({
+          json: {
+            feedIdList,
+          },
+        }),
+      () => SubscriptionService.removeSubscriptionMany(whoami()!.id, feedIdList),
+    )
   }
 
   async changeCategoryView(

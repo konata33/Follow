@@ -1,24 +1,24 @@
 import type { User } from "@auth/core/types"
+import { PhUsersBold } from "@follow/components/icons/users.jsx"
+import { Avatar, AvatarFallback, AvatarImage } from "@follow/components/ui/avatar/index.jsx"
+import { ActionButton, Button } from "@follow/components/ui/button/index.js"
+import { LoadingWithIcon } from "@follow/components/ui/loading/index.jsx"
+import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@follow/components/ui/tooltip/index.jsx"
+import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/index.js"
+import type { FeedModel, Models } from "@follow/models"
+import { stopPropagation } from "@follow/utils/dom"
+import { UrlBuilder } from "@follow/utils/url-builder"
+import { cn } from "@follow/utils/utils"
 import { useQuery } from "@tanstack/react-query"
 import type { FC } from "react"
 import { useTranslation } from "react-i18next"
 
 import { getTrendingAggregates } from "~/api/trending"
-import { FeedIcon } from "~/components/feed-icon"
-import { PhUsersBold } from "~/components/icons/users"
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar"
-import { ActionButton, Button } from "~/components/ui/button"
-import { LoadingWithIcon } from "~/components/ui/loading"
-import { useCurrentModal, useModalStack } from "~/components/ui/modal"
 import { DrawerModalLayout } from "~/components/ui/modal/stacked/custom-modal"
-import { ScrollArea } from "~/components/ui/scroll-area"
-import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip"
-import { EllipsisHorizontalTextWithTooltip } from "~/components/ui/typography"
+import { useCurrentModal, useModalStack } from "~/components/ui/modal/stacked/hooks"
 import { useFollow } from "~/hooks/biz/useFollow"
-import { stopPropagation } from "~/lib/dom"
-import { UrlBuilder } from "~/lib/url-builder"
-import { cn } from "~/lib/utils"
-import type { FeedModel, Models } from "~/models"
+import { FeedIcon } from "~/modules/feed/feed-icon"
 
 import { usePresentUserProfileModal } from "../profile/hooks"
 
@@ -114,14 +114,14 @@ const TrendingLists: FC<{
                 follow({ isList: true, id: item.id })
               }}
             >
-              <div className="absolute -inset-y-1 inset-x-0 rounded-lg duration-200 group-hover:bg-theme-item-hover" />
+              <div className="absolute -inset-y-1 inset-x-0 z-[-1] rounded-lg duration-200 group-hover:bg-theme-item-hover" />
               <FeedIcon feed={item as any} size={40} />
 
               <div className={cn("ml-1 flex w-full flex-col text-left")}>
                 <div className="flex items-end gap-2">
                   <div className={cn("truncate text-base font-medium")}>{item.title}</div>
 
-                  <UserCount count={item.subscriberCount} />
+                  {!!item.subscriberCount && <UserCount count={item.subscriberCount} />}
                 </div>
                 {!!item.description && (
                   <div className={"line-clamp-2 text-xs"}>{item.description}</div>
@@ -135,11 +135,11 @@ const TrendingLists: FC<{
   )
 }
 
-const UserCount = ({ count }: { count: number }) => {
+const UserCount: Component<{ count: number }> = ({ count, className }) => {
   return (
-    <span className="flex -translate-y-0.5 items-center gap-0.5 text-xs tabular-nums text-gray-500">
+    <span className={cn("flex items-center gap-0.5 text-xs tabular-nums opacity-60", className)}>
       <PhUsersBold className="size-3" />
-      {count}
+      <span>{count}</span>
     </span>
   )
 }
@@ -215,7 +215,7 @@ const TrendingUsers: FC<{ data: User[] }> = ({ data }) => {
                   profile(user.id)
                 }}
               >
-                <div className="absolute -inset-2 right-0 rounded-lg duration-200 group-hover:bg-theme-item-hover" />
+                <div className="absolute -inset-2 right-0 z-[-1] rounded-lg duration-200 group-hover:bg-theme-item-hover" />
                 <Avatar className="block aspect-square size-[40px] overflow-hidden rounded-full border border-border ring-1 ring-background">
                   <AvatarImage src={user?.image || undefined} />
                   <AvatarFallback>{user.name?.slice(0, 2)}</AvatarFallback>
@@ -261,7 +261,7 @@ const TrendingFeeds = ({ data }: { data: FeedModel[] }) => {
               </a>
 
               <div className="pr-2">
-                <UserCount count={(feed as any).subscriberCount} />
+                <UserCount className="-mr-2" count={(feed as any).subscriberCount} />
 
                 <Button
                   type="button"
@@ -295,17 +295,19 @@ const TrendingEntries = ({ data }: { data: Models.TrendingEntry[] }) => {
           return (
             <li
               key={entry.id}
-              className="relative truncate whitespace-nowrap py-0.5 pr-10 marker:text-accent"
+              className="relative grid w-full grid-cols-[1fr_auto] gap-2 whitespace-nowrap py-0.5 marker:text-accent"
             >
-              <a
-                href={entry.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="follow-link--underline truncate text-sm"
-              >
-                {entry.title}
-              </a>
-              <span className="absolute right-0 top-0 flex items-center gap-0.5 text-xs opacity-60">
+              <div className="m-0 min-w-0 truncate p-0">
+                <a
+                  href={entry.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="follow-link--underline truncate text-sm"
+                >
+                  {entry.title}
+                </a>
+              </div>
+              <span className="flex items-center gap-0.5 text-xs tabular-nums opacity-60">
                 <i className="i-mingcute-book-2-line" />
                 <span>{entry.readCount}</span>
               </span>

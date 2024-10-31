@@ -1,8 +1,12 @@
+import { MemoedDangerousHTMLStyle } from "@follow/components/common/MemoedDangerousHTMLStyle.jsx"
+import { Checkbox } from "@follow/components/ui/checkbox/index.jsx"
 import type { Element, Parent, Text } from "hast"
 import type { Schema } from "hast-util-sanitize"
 import type { Components } from "hast-util-to-jsx-runtime"
 import { toJsxRuntime } from "hast-util-to-jsx-runtime"
+import { toMdast } from "hast-util-to-mdast"
 import { toText } from "hast-util-to-text"
+import { toMarkdown } from "mdast-util-to-markdown"
 import { createElement } from "react"
 import { Fragment, jsx, jsxs } from "react/jsx-runtime"
 import { renderToString } from "react-dom/server"
@@ -16,7 +20,6 @@ import { visit } from "unist-util-visit"
 import { VFile } from "vfile"
 
 import { ShadowDOM } from "~/components/common/ShadowDOM"
-import { Checkbox } from "~/components/ui/checkbox"
 import { ShikiHighLighter } from "~/components/ui/code-highlighter"
 import { LazyKateX } from "~/components/ui/katex/lazy"
 import { MarkdownBlockImage, MarkdownLink, MarkdownP } from "~/components/ui/markdown/renderers"
@@ -234,12 +237,14 @@ export const parseHtml = (
         },
       }),
     toText: () => toText(hastTree),
+    toMarkdown: () => toMarkdown(toMdast(hastTree)),
   }
 }
 
 const Img: Components["img"] = ({ node, ...props }) => {
   const nextProps = {
     ...props,
+    preferOrigin: true,
     proxy: { height: 0, width: 700 },
   }
   const widthPx = Number.parseInt(props.width as string)
@@ -312,10 +317,12 @@ export function extractCodeFromHtml(htmlString: string) {
 const Style: Components["style"] = ({ node, ...props }) => {
   const isShadowDOM = ShadowDOM.useIsShadowDOM()
 
-  if (isShadowDOM) {
-    return createElement("style", {
-      ...props,
-    })
+  if (isShadowDOM && typeof props.children === "string") {
+    return createElement(
+      MemoedDangerousHTMLStyle,
+      null,
+      props.children.replaceAll(/html|body/g, "#shadow-html"),
+    )
   }
   return null
 }

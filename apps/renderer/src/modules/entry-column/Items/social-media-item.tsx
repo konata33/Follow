@@ -1,24 +1,26 @@
+import { ActionButton } from "@follow/components/ui/button/index.js"
+import { Skeleton } from "@follow/components/ui/skeleton/index.jsx"
+import { cn } from "@follow/utils/utils"
 import { Slot } from "@radix-ui/react-slot"
 import { atom } from "jotai"
 import { useLayoutEffect, useRef } from "react"
 
-import { FeedIcon } from "~/components/feed-icon"
-import { ActionButton } from "~/components/ui/button"
 import { RelativeTime } from "~/components/ui/datetime"
 import { Media } from "~/components/ui/media"
 import { usePreviewMedia } from "~/components/ui/media/hooks"
-import { Skeleton } from "~/components/ui/skeleton"
 import { useAsRead } from "~/hooks/biz/useAsRead"
 import { useEntryActions } from "~/hooks/biz/useEntryActions"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { getImageProxyUrl } from "~/lib/img-proxy"
 import { jotaiStore } from "~/lib/jotai"
 import { parseSocialMedia } from "~/lib/parsers"
-import { cn, filterSmallMedia } from "~/lib/utils"
+import { FeedIcon } from "~/modules/feed/feed-icon"
+import { FeedTitle } from "~/modules/feed/feed-title"
 import { useEntry } from "~/store/entry/hooks"
 import { useFeedById } from "~/store/feed"
 
 import { ReactVirtuosoItemPlaceholder } from "../../../components/ui/placeholder"
+import { filterSmallMedia } from "../../../lib/utils"
 import { StarIcon } from "../star-icon"
 import { EntryTranslation } from "../translation"
 import type { EntryItemStatelessProps, EntryListItemFC } from "../types"
@@ -61,7 +63,7 @@ export const SocialMediaItem: EntryListItemFC = ({ entryId, entryPreview, transl
         <div className="-mt-0.5 flex-1 text-sm">
           <div className="w-[calc(100%-10rem)] space-x-1 leading-6">
             <span className="inline-flex items-center gap-1 text-base font-semibold">
-              <span>{entry.entries.author || feed.title}</span>
+              <FeedTitle feed={feed} title={entry.entries.author || feed.title} />
               {parsed?.type === "x" && (
                 <i className="i-mgc-twitter-cute-fi size-3 text-[#4A99E9]" />
               )}
@@ -209,7 +211,7 @@ export function SocialMediaItemStateLess({ entry, feed }: EntryItemStatelessProp
           <div className="ml-2 min-w-0 flex-1">
             <div className="-mt-0.5 line-clamp-5 flex-1 text-sm">
               <div className="flex space-x-1">
-                <span>{feed.title}</span>
+                <FeedTitle feed={feed} />
                 <span className="text-zinc-500">·</span>
                 <span>{!!entry.publishedAt && <RelativeTime date={entry.publishedAt} />}</span>
               </div>

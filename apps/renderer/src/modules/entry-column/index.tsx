@@ -1,3 +1,11 @@
+import { AutoResizeHeight } from "@follow/components/ui/auto-resize-height/index.jsx"
+import { Button } from "@follow/components/ui/button/index.js"
+import { LoadingCircle } from "@follow/components/ui/loading/index.jsx"
+import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
+import { FeedViewType, views } from "@follow/constants"
+import { useTitle, useTypeScriptHappyCallback } from "@follow/hooks"
+import type { FeedModel } from "@follow/models/types"
+import { clsx, isBizId } from "@follow/utils/utils"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type {
@@ -13,24 +21,17 @@ import { setUISetting, useUISettingKey } from "~/atoms/settings/ui"
 import { m } from "~/components/common/Motion"
 import { FeedFoundCanBeFollowError } from "~/components/errors/FeedFoundCanBeFollowErrorFallback"
 import { FeedNotFound } from "~/components/errors/FeedNotFound"
-import { AutoResizeHeight } from "~/components/ui/auto-resize-height"
-import { Button } from "~/components/ui/button"
-import { LoadingCircle } from "~/components/ui/loading"
 import { ReactVirtuosoItemPlaceholder } from "~/components/ui/placeholder"
-import { ScrollArea } from "~/components/ui/scroll-area"
-import { FEED_COLLECTION_LIST, ROUTE_FEED_PENDING, views } from "~/constants"
+import { FEED_COLLECTION_LIST, ROUTE_FEED_PENDING } from "~/constants"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { useRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { useTitle, useTypeScriptHappyCallback } from "~/hooks/common"
-import { FeedViewType } from "~/lib/enum"
-import { cn, isBizId } from "~/lib/utils"
-import type { FeedModel } from "~/models"
 import { useFeed } from "~/queries/feed"
 import { entryActions, getEntry, useEntry } from "~/store/entry"
 import { useFeedById, useFeedHeaderTitle } from "~/store/feed"
 import { useSubscriptionByFeedId } from "~/store/subscription"
 
 import { useEntriesByView, useEntryMarkReadHandler } from "./hooks"
+import { useSnapEntryIdList } from "./hooks/useEntryIdListSnap"
 import { EntryItem, EntryItemSkeleton } from "./item"
 import { PictureMasonry } from "./Items/picture-masonry"
 import { EntryListHeader } from "./layouts/EntryListHeader"
@@ -55,7 +56,9 @@ function EntryColumnImpl() {
     }, []),
     isArchived,
   })
+
   const { entriesIds, isFetchingNextPage, groupedCounts } = entries
+  useSnapEntryIdList(entriesIds)
 
   const {
     entryId: activeEntryId,
@@ -63,6 +66,8 @@ function EntryColumnImpl() {
     feedId: routeFeedId,
     isPendingEntry,
     isCollection,
+    inboxId,
+    listId,
   } = useRouteParams()
   const activeEntry = useEntry(activeEntryId)
   const feed = useFeedById(routeFeedId)
@@ -102,6 +107,24 @@ function EntryColumnImpl() {
     entries.totalCount < 40 &&
     feed?.type === "feed"
 
+  const shouldLoadArchivedEntries =
+    !isArchived &&
+    !unreadOnly &&
+    !isCollection &&
+    routeFeedId !== ROUTE_FEED_PENDING &&
+    (feed?.type === "feed" || !feed) &&
+    !inboxId &&
+    !listId &&
+    entries.totalCount === 0 &&
+    !entries.isLoading
+
+  // automatically fetch archived entries when there is no entries in timeline
+  useEffect(() => {
+    if (shouldLoadArchivedEntries) {
+      setIsArchived(true)
+    }
+  }, [shouldLoadArchivedEntries])
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtuosoOptions = {
     components: {
@@ -130,7 +153,7 @@ function EntryColumnImpl() {
             />
           )
         }
-      }, [isFetchingNextPage, view, unreadOnly, isArchived, entries]),
+      }, [isFetchingNextPage, showArchivedButton, t, view, entries.data?.pages]),
       ScrollSeekPlaceholder: useCallback(() => <EntryItemSkeleton view={view} count={1} />, [view]),
     },
     scrollSeekConfiguration,
@@ -200,16 +223,16 @@ function EntryColumnImpl() {
       </AutoResizeHeight>
       <m.div
         key={`${routeFeedId}-${view}`}
-        className="relative h-0 grow"
+        className="relative mt-2 h-0 grow"
         initial={{ opacity: 0.01, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0.01, y: -100 }}
       >
         <ScrollArea.ScrollArea
-          scrollbarClassName={cn("mt-3", !views[view].wideMode ? "w-[5px] p-0" : "")}
+          scrollbarClassName={!views[view].wideMode ? "w-[5px] p-0" : ""}
           mask={false}
           ref={scrollRef}
-          rootClassName="h-full"
+          rootClassName={clsx("h-full", views[view].wideMode ? "mt-2" : "")}
           viewportClassName="[&>div]:grow flex"
         >
           {virtuosoOptions.totalCount === 0 && !showArchivedButton ? (

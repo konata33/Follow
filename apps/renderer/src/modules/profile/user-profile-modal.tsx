@@ -1,3 +1,15 @@
+import { FollowIcon } from "@follow/components/icons/follow.jsx"
+import { AutoResizeHeight } from "@follow/components/ui/auto-resize-height/index.jsx"
+import { Avatar, AvatarFallback, AvatarImage } from "@follow/components/ui/avatar/index.jsx"
+import { ActionButton, Button } from "@follow/components/ui/button/index.js"
+import { LoadingCircle, LoadingWithIcon } from "@follow/components/ui/loading/index.jsx"
+import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
+import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/index.js"
+import type { SubscriptionModel } from "@follow/models/types"
+import { nextFrame, stopPropagation } from "@follow/utils/dom"
+import { getStorageNS } from "@follow/utils/ns"
+import { UrlBuilder } from "@follow/utils/url-builder"
+import { clsx, cn } from "@follow/utils/utils"
 import { AnimatePresence, useAnimationControls } from "framer-motion"
 import { useAtom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
@@ -7,25 +19,13 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { m } from "~/components/common/Motion"
-import { FeedIcon } from "~/components/feed-icon"
-import { FollowIcon } from "~/components/icons/follow"
-import { AutoResizeHeight } from "~/components/ui/auto-resize-height"
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar"
-import { ActionButton, Button } from "~/components/ui/button"
-import { LoadingCircle, LoadingWithIcon } from "~/components/ui/loading"
-import { useCurrentModal } from "~/components/ui/modal"
-import { ScrollArea } from "~/components/ui/scroll-area"
-import { EllipsisHorizontalTextWithTooltip } from "~/components/ui/typography"
+import { useCurrentModal } from "~/components/ui/modal/stacked/hooks"
 import { useFollow } from "~/hooks/biz/useFollow"
 import { useAuthQuery, useI18n } from "~/hooks/common"
 import { apiClient } from "~/lib/api-fetch"
 import { defineQuery } from "~/lib/defineQuery"
-import { nextFrame, stopPropagation } from "~/lib/dom"
 import { replaceImgUrlIfNeed } from "~/lib/img-proxy"
-import { getStorageNS } from "~/lib/ns"
-import { UrlBuilder } from "~/lib/url-builder"
-import { cn } from "~/lib/utils"
-import type { SubscriptionModel } from "~/models"
+import { FeedIcon } from "~/modules/feed/feed-icon"
 import { useUserSubscriptionsQuery } from "~/modules/profile/hooks"
 import { useSubscriptionStore } from "~/store/subscription"
 import { useUserById } from "~/store/user"
@@ -60,15 +60,18 @@ export const UserProfileModalContent: FC<{
         avatar: user.data.image,
         name: user.data.name,
         handle: user.data.handle,
+        id: user.data.id,
       }
     : storeUser
       ? {
           avatar: storeUser.image,
           name: storeUser.name,
           handle: storeUser.handle,
+          id: storeUser.id,
         }
       : null
 
+  const follow = useFollow()
   const subscriptions = useUserSubscriptionsQuery(user.data?.id)
   const modal = useCurrentModal()
   const controller = useAnimationControls()
@@ -258,7 +261,7 @@ export const UserProfileModalContent: FC<{
                 layout
                 transition={{ duration: 0.35 }}
                 className={cn(
-                  "flex cursor-text select-text flex-col items-center",
+                  "relative flex cursor-text select-text flex-col items-center",
                   isHeaderSimple ? "ml-8 items-start" : "",
                 )}
               >
@@ -270,16 +273,29 @@ export const UserProfileModalContent: FC<{
                 >
                   <m.h1 layout>{userInfo.name}</m.h1>
                 </m.div>
-
                 <m.div
                   className={cn(
-                    "mb-0 text-sm text-zinc-500",
+                    "text-sm text-zinc-500",
                     userInfo.handle ? "visible" : "hidden select-none",
                   )}
                   layout
                 >
                   @{userInfo.handle}
                 </m.div>
+                <Button
+                  buttonClassName={cn(
+                    isHeaderSimple ? "absolute -right-full top-4 rounded-full p-2" : "mt-4",
+                  )}
+                  onClick={() => {
+                    follow({
+                      url: `rsshub://follow/profile/${userInfo.id}`,
+                      isList: false,
+                    })
+                  }}
+                >
+                  <FollowIcon className={clsx("size-3", !isHeaderSimple ? "mr-1" : "")} />
+                  {isHeaderSimple ? "" : t("feed_form.follow")}
+                </Button>
               </m.div>
             </div>
             <ScrollArea.ScrollArea

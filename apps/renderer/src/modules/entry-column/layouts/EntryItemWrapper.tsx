@@ -1,19 +1,19 @@
+import type { FeedViewType } from "@follow/constants"
+import { views } from "@follow/constants"
+import { useAnyPointDown } from "@follow/hooks"
+import { cn } from "@follow/utils/utils"
 import type { FC, PropsWithChildren } from "react"
 import { useCallback, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useDebounceCallback } from "usehooks-ts"
 
 import { useGeneralSettingKey } from "~/atoms/settings/general"
-import { views } from "~/constants/tabs"
 import { useAsRead } from "~/hooks/biz/useAsRead"
 import { useEntryActions } from "~/hooks/biz/useEntryActions"
 import { useFeedActions } from "~/hooks/biz/useFeedActions"
 import { useNavigateEntry } from "~/hooks/biz/useNavigateEntry"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { useAnyPointDown } from "~/hooks/common"
-import type { FeedViewType } from "~/lib/enum"
 import { showNativeMenu } from "~/lib/native-menu"
-import { cn } from "~/lib/utils"
 import type { FlatEntryModel } from "~/store/entry"
 import { entryActions } from "~/store/entry"
 
@@ -25,14 +25,16 @@ export const EntryItemWrapper: FC<
     style?: React.CSSProperties
   } & PropsWithChildren
 > = ({ entry, view, children, itemClassName, style }) => {
+  const listId = useRouteParamsSelector((s) => s.listId)
   const { items } = useEntryActions({
     view,
     entry,
     type: "entryList",
+    inList: !!listId,
   })
 
   const { items: feedItems } = useFeedActions({
-    feedId: entry.feedId,
+    feedId: entry.feedId || entry.inboxId,
     view,
     type: "entryList",
   })
@@ -74,7 +76,7 @@ export const EntryItemWrapper: FC<
     [entry.entries.url],
   )
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
-  useAnyPointDown(() => setIsContextMenuOpen(false))
+  useAnyPointDown(() => isContextMenuOpen && setIsContextMenuOpen(false))
   const handleContextMenu: React.MouseEventHandler<HTMLDivElement> = useCallback(
     (e) => {
       e.preventDefault()

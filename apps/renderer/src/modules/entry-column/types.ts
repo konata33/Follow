@@ -1,12 +1,17 @@
+import type {
+  CombinedEntryModel,
+  EntryModelSimple,
+  FeedModel,
+  FeedOrListRespModel,
+} from "@follow/models/types"
 import type { FC } from "react"
-
-import type { CombinedEntryModel, EntryModelSimple, FeedModel, FeedOrListRespModel } from "~/models"
 
 export type UniversalItemProps = {
   entryId: string
   entryPreview?: CombinedEntryModel & {
     feeds: FeedOrListRespModel
     feedId: string
+    inboxId: string
   }
   translation?: {
     title?: string

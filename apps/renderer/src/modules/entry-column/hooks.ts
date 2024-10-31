@@ -1,9 +1,9 @@
+import { views } from "@follow/constants"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ListRange } from "react-virtuoso"
 import { useDebounceCallback } from "usehooks-ts"
 
 import { useGeneralSettingKey } from "~/atoms/settings/general"
-import { views } from "~/constants"
 import { useRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { useAuthQuery } from "~/hooks/common"
 import { entries, useEntries } from "~/queries/entries"
@@ -49,6 +49,7 @@ export const useEntryMarkReadHandler = (entriesIds: string[]) => {
     return
   }, [feedView, handleMarkReadInRange, handleRenderAsRead, renderAsRead, scrollMarkUnread])
 }
+const anyString = [] as string[]
 export const useEntriesByView = ({
   onReset,
   isArchived,
@@ -103,13 +104,15 @@ export const useEntriesByView = ({
     setPauseQuery(hasUpdate)
   }, [hasUpdate])
 
-  const remoteEntryIds = useMemo(
-    () =>
-      query.data?.pages
-        ?.map((page) => page.data?.map((entry) => entry.entries.id))
-        .flat() as string[],
-    [query.data?.pages],
-  )
+  const remoteEntryIds = useMemo(() => {
+    if (!query.data?.pages) return void 0
+    // FIXME The back end should not return duplicate data, and the front end the unique id here.
+    return [
+      ...new Set(
+        query.data?.pages?.map((page) => page.data?.map((entry) => entry.entries.id)).flat(),
+      ).values(),
+    ] as string[]
+  }, [query.data?.pages])
 
   const currentEntries = useEntryIdsByFeedIdOrView(isAllFeeds ? view : folderIds || feedId!, {
     unread: unreadOnly,
@@ -123,7 +126,7 @@ export const useEntriesByView = ({
   // then we have no way to incrementally update the data.
   // We need to add an interface to incrementally update the data based on the version hash.
 
-  const entryIds = remoteEntryIds || currentEntries
+  const entryIds: string[] = remoteEntryIds || currentEntries || anyString
 
   // in unread only entries only can grow the data, but not shrink
   // so we memo this previous data to avoid the flicker
@@ -213,7 +216,7 @@ export const useEntriesByView = ({
     refetch: useCallback(() => {
       query.refetch()
       feedUnreadActions.fetchUnreadByView(view)
-    }, [query]),
+    }, [query, view]),
     entriesIds: sortEntries,
     groupedCounts,
     totalCount: query.data?.pages?.[0]?.total ?? mergedEntries[view].length,

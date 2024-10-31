@@ -13,7 +13,7 @@
     ·
     <a href="https://x.com/intent/follow?screen_name=follow_app_">Twitter</a>
     ·
-    <a href="https://github.com/RSSNext/Follow/releases">Releases</a>
+    <a href="https://github.com/RSSNext/Follow/releases/latest">Releases</a>
     <br />
     <br />
     <a href="https://trendshift.io/repositories/9938" target="_blank"><img src="https://github.com/user-attachments/assets/7d394847-f019-46e5-94ec-5bf4ccda6146" alt="RSSNext%2Ffollow | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
@@ -91,7 +91,7 @@ If you have access, you are welcome to use the following methods to download and
 - You can get the installation packages for each platform from the [Releases page](https://github.com/RSSNext/Follow/releases).
 - If you are using Arch Linux, you can install package [follow-appimage](https://aur.archlinux.org/packages/follow-appimage) that maintained by [timochan](https://github.com/ttimochan).
 - If you are using Nix, you can install package [follow](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/fo/follow/package.nix) that maintained by [iosmanthus](https://github.com/iosmanthus).
-- If you are using macOS with [Homebrew](https://brew.sh), you can install package [follow](https://formulae.brew.sh/cask/follow) or [follow@nightly](https://formulae.brew.sh/cask/follow@nightly) that maintained by [realSunyz](https://github.com/realSunyz).
+- If you are using macOS with [Homebrew](https://brew.sh), you can install cask [follow](https://formulae.brew.sh/cask/follow) (also [@alpha](https://formulae.brew.sh/cask/follow@alpha) and [@nightly](https://formulae.brew.sh/cask/follow@nightly)) that maintained by [realSunyz](https://github.com/realSunyz).
 
 ## Contributing
 

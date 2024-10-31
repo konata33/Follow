@@ -1,4 +1,10 @@
+import { useViewport } from "@follow/components/hooks/useViewport.js"
+import { PanelSplitter } from "@follow/components/ui/divider/index.js"
+import { RootPortal } from "@follow/components/ui/portal/index.jsx"
+import { useOnce } from "@follow/hooks"
 import { IN_ELECTRON } from "@follow/shared/constants"
+import { preventDefault } from "@follow/utils/dom"
+import { cn } from "@follow/utils/utils"
 import { repository } from "@pkg"
 import { Slot } from "@radix-ui/react-slot"
 import { throttle } from "lodash-es"
@@ -9,9 +15,9 @@ import { useHotkeys } from "react-hotkeys-hook"
 import { Trans, useTranslation } from "react-i18next"
 import { useResizable } from "react-resizable-layout"
 import { Outlet } from "react-router-dom"
+import { toast } from "sonner"
 
 import { setMainContainerElement } from "~/atoms/dom"
-import { useViewport } from "~/atoms/hooks/viewport"
 import { getUISettings, setUISetting, useUISettingKey } from "~/atoms/settings/ui"
 import {
   getFeedColumnTempShow,
@@ -23,17 +29,13 @@ import {
 import { useLoginModalShow, useWhoami } from "~/atoms/user"
 import { AppErrorBoundary } from "~/components/common/AppErrorBoundary"
 import { ErrorComponentType } from "~/components/errors/enum"
-import { PanelSplitter } from "~/components/ui/divider"
 import { Kbd } from "~/components/ui/kbd/Kbd"
 import { PlainModal } from "~/components/ui/modal/stacked/custom-modal"
 import { DeclarativeModal } from "~/components/ui/modal/stacked/declarative-modal"
-import { RootPortal } from "~/components/ui/portal"
 import { HotKeyScopeMap } from "~/constants"
 import { shortcuts } from "~/constants/shortcuts"
 import { useDailyTask } from "~/hooks/biz/useDailyTask"
 import { useAuthQuery, useI18n } from "~/hooks/common"
-import { preventDefault } from "~/lib/dom"
-import { cn } from "~/lib/utils"
 import { EnvironmentIndicator } from "~/modules/app/EnvironmentIndicator"
 import { NetworkStatusIndicator } from "~/modules/app/NetworkStatusIndicator"
 import { LoginModalContent } from "~/modules/auth/LoginModalContent"
@@ -85,6 +87,22 @@ const errorTypes = [
   ErrorComponentType.FeedNotFound,
 ] as ErrorComponentType[]
 
+const useAppUpgraded = () => {
+  useOnce(() => {
+    if (window.__app_is_upgraded__) {
+      setTimeout(() => {
+        toast.success(
+          <div>
+            App is upgraded to{" "}
+            <a href={`${repository.url}/releases/tag/${APP_VERSION}`}>{APP_VERSION}</a>, enjoy the
+            new features! 🎉
+          </div>,
+        )
+      })
+    }
+  })
+}
+
 const supportMinWidth = 1024
 export function Component() {
   const isAuthFail = useLoginModalShow()
@@ -93,6 +111,7 @@ export function Component() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useDailyTask()
+  useAppUpgraded()
 
   const isNotSupportWidth = useViewport((v) => v.w < supportMinWidth && v.w !== 0) && !IN_ELECTRON
 

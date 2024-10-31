@@ -1,4 +1,6 @@
-import { cn, getLevelMultiplier } from "~/lib/utils"
+import { cn } from "@follow/utils/utils"
+
+import { getLevelMultiplier } from "~/lib/utils"
 
 export const Level = ({
   level,
@@ -18,7 +20,7 @@ export const Level = ({
         <span className="h-3 w-8 animate-pulse rounded-xl bg-theme-inactive" />
       ) : (
         <>
-          <span>Lv.{level}</span>
+          <span className="tabular-nums">Lv.{level}</span>
           <sub className="-translate-y-px text-[0.6rem] font-normal">
             {getLevelMultiplier(level)}x
           </sub>

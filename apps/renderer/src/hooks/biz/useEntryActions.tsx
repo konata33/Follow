@@ -1,4 +1,15 @@
+import {
+  SimpleIconsEagle,
+  SimpleIconsInstapaper,
+  SimpleIconsObsidian,
+  SimpleIconsOmnivore,
+  SimpleIconsReadwise,
+} from "@follow/components/ui/platform-icon/icons.js"
+import { FeedViewType } from "@follow/constants"
+import type { CombinedEntryModel } from "@follow/models/types"
 import { IN_ELECTRON } from "@follow/shared/constants"
+import { nextFrame } from "@follow/utils/dom"
+import { getOS } from "@follow/utils/utils"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import type { FetchError } from "ofetch"
 import { ofetch } from "ofetch"
@@ -8,6 +19,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
+  getReadabilityContent,
   getReadabilityStatus,
   ReadabilityStatus,
   setReadabilityContent,
@@ -22,24 +34,15 @@ import {
 } from "~/atoms/source-content"
 import { whoami } from "~/atoms/user"
 import { mountLottie } from "~/components/ui/lottie-container"
-import {
-  SimpleIconsEagle,
-  SimpleIconsInstapaper,
-  SimpleIconsObsidian,
-  SimpleIconsOmnivore,
-  SimpleIconsReadwise,
-} from "~/components/ui/platform-icon/icons"
 import { shortcuts } from "~/constants/shortcuts"
 import { tipcClient } from "~/lib/client"
-import { nextFrame } from "~/lib/dom"
-import { FeedViewType } from "~/lib/enum"
-import { getOS } from "~/lib/utils"
+import { parseHtml } from "~/lib/parse-html"
 import StarAnimationUri from "~/lottie/star.lottie?url"
-import type { CombinedEntryModel } from "~/models"
 import { useTipModal } from "~/modules/wallet/hooks"
 import type { FlatEntryModel } from "~/store/entry"
 import { entryActions } from "~/store/entry"
-import { useFeedById } from "~/store/feed"
+import { getFeedById, useFeedById } from "~/store/feed"
+import { useInboxById } from "~/store/inbox"
 
 import { navigateEntry } from "./useNavigateEntry"
 
@@ -108,23 +111,27 @@ export const useUnCollect = (entry: Nullable<CombinedEntryModel>) => {
 
 export const useRead = () =>
   useMutation({
-    mutationFn: async (entry: Nullable<CombinedEntryModel>) =>
-      entry &&
-      entryActions.markRead({
-        feedId: entry.feeds.id,
+    mutationFn: async (entry: Nullable<CombinedEntryModel>) => {
+      const relatedId = entry?.feeds?.id || entry?.inboxes?.id
+      if (!relatedId) return
+      return entryActions.markRead({
+        feedId: relatedId,
         entryId: entry.entries.id,
         read: true,
-      }),
+      })
+    },
   })
 export const useUnread = () =>
   useMutation({
-    mutationFn: async (entry: Nullable<CombinedEntryModel>) =>
-      entry &&
-      entryActions.markRead({
-        feedId: entry.feeds.id,
+    mutationFn: async (entry: Nullable<CombinedEntryModel>) => {
+      const relatedId = entry?.feeds?.id || entry?.inboxes?.id
+      if (!relatedId) return
+      return entryActions.markRead({
+        feedId: relatedId,
         entryId: entry.entries.id,
         read: false,
-      }),
+      })
+    },
   })
 
 export const useDeleteInboxEntry = () => {
@@ -146,28 +153,40 @@ export const useEntryActions = ({
   view,
   entry,
   type,
+  inList,
 }: {
   view?: number
   entry?: FlatEntryModel | null
   type?: "toolbar" | "entryList"
+  inList?: boolean
 }) => {
   const { t } = useTranslation()
 
-  const feed = useFeedById(entry?.feedId)
-  const isInbox = feed?.type === "inbox"
+  const feed = useFeedById(entry?.feedId, (feed) => {
+    return {
+      type: feed.type,
+      ownerUserId: feed.ownerUserId,
+      id: feed.id,
+    }
+  })
+
+  const inbox = useInboxById(entry?.inboxId)
+  const isInbox = !!inbox
 
   const populatedEntry = useMemo(() => {
     if (!entry) return null
-    if (!feed) return null
+    if (!feed?.id && !inbox?.id) return null
+
     return {
       ...entry,
-      feeds: feed!,
+      feeds: feed ? getFeedById(feed.id) : undefined,
+      inboxes: inbox,
     } as CombinedEntryModel
-  }, [entry, feed])
+  }, [entry, feed, inbox])
 
   const openTipModal = useTipModal({
-    userId: populatedEntry?.feeds.ownerUserId ?? undefined,
-    feedId: populatedEntry?.feeds.id ?? undefined,
+    userId: populatedEntry?.feeds?.ownerUserId ?? undefined,
+    feedId: populatedEntry?.feeds?.id ?? undefined,
     entryId: populatedEntry?.entries.id ?? undefined,
   })
 
@@ -258,10 +277,15 @@ export const useEntryActions = ({
           if (!populatedEntry.entries.url || !populatedEntry.entries.media?.length) {
             return
           }
+          window.analytics?.capture("integration", {
+            type: "eagle",
+            event: "save",
+          })
           const response = await tipcClient?.saveToEagle({
             url: populatedEntry.entries.url,
             mediaUrls: populatedEntry.entries.media.map((m) => m.url),
           })
+
           if (response?.status === "success") {
             toast.success(t("entry_actions.saved_to_eagle"), {
               duration: 3000,
@@ -280,6 +304,10 @@ export const useEntryActions = ({
         hide: !enableReadwise || !readwiseToken || !populatedEntry.entries.url,
         onClick: async () => {
           try {
+            window.analytics?.capture("integration", {
+              type: "readwise",
+              event: "save",
+            })
             const data = await ofetch("https://readwise.io/api/v3/save/", {
               method: "POST",
               headers: {
@@ -296,6 +324,7 @@ export const useEntryActions = ({
                 saved_using: "Follow",
               },
             })
+
             toast.success(
               <>
                 {t("entry_actions.saved_to_readwise")},{" "}
@@ -325,6 +354,10 @@ export const useEntryActions = ({
           !populatedEntry.entries.url,
         onClick: async () => {
           try {
+            window.analytics?.capture("integration", {
+              type: "instapaper",
+              event: "save",
+            })
             const data = await ofetch("https://www.instapaper.com/api/add", {
               query: {
                 url: populatedEntry.entries.url,
@@ -336,6 +369,7 @@ export const useEntryActions = ({
               },
               parseResponse: JSON.parse,
             })
+
             toast.success(
               <>
                 {t("entry_actions.saved_to_instapaper")},{" "}
@@ -379,6 +413,10 @@ export const useEntryActions = ({
   }
 `
 
+          window.analytics?.capture("integration", {
+            type: "omnivore",
+            event: "save",
+          })
           try {
             const data = await ofetch(omnivoreEndpoint, {
               method: "POST",
@@ -424,10 +462,21 @@ export const useEntryActions = ({
         onClick: () => {
           if (!isObsidianEnabled || !populatedEntry?.entries?.url || !IN_ELECTRON) return
 
+          const isReadabilityReady =
+            getReadabilityStatus()[populatedEntry.entries.id] === ReadabilityStatus.SUCCESS
+          const content =
+            (isReadabilityReady
+              ? getReadabilityContent()[populatedEntry.entries.id].content
+              : populatedEntry.entries.content) || ""
+          const markdownContent = parseHtml(content).toMarkdown()
+          window.analytics?.capture("integration", {
+            type: "obsidian",
+            event: "save",
+          })
           saveToObsidian.mutate({
             url: populatedEntry.entries.url,
             title: populatedEntry.entries.title || "",
-            content: populatedEntry.entries.content || "",
+            content: markdownContent,
             author: populatedEntry.entries.author || "",
             publishedAt: populatedEntry.entries.publishedAt || "",
             vaultPath: obsidianVaultPath,
@@ -577,7 +626,7 @@ export const useEntryActions = ({
         name: t("entry_actions.mark_as_read"),
         shortcut: shortcuts.entry.toggleRead.key,
         className: "i-mgc-round-cute-fi",
-        hide: !!(!!populatedEntry.read || populatedEntry.collections),
+        hide: !!(!!populatedEntry.read || populatedEntry.collections) || inList,
         onClick: () => {
           read.mutate(populatedEntry)
         },
@@ -587,7 +636,7 @@ export const useEntryActions = ({
         name: t("entry_actions.mark_as_unread"),
         shortcut: shortcuts.entry.toggleRead.key,
         className: "i-mgc-round-cute-re",
-        hide: !!(!populatedEntry.read || populatedEntry.collections),
+        hide: !!(!populatedEntry.read || populatedEntry.collections) || inList,
         onClick: () => {
           unread.mutate(populatedEntry)
         },
@@ -615,11 +664,13 @@ export const useEntryActions = ({
     feed?.ownerUserId,
     type,
     showSourceContent,
-    obsidianVaultPath,
+    inList,
     saveToObsidian,
+    obsidianVaultPath,
     openTipModal,
     collect,
     uncollect,
+    deleteInboxEntry,
     showSourceContentModal,
     read,
     unread,

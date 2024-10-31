@@ -1,4 +1,8 @@
-import { useSingleton } from "foxact/use-singleton"
+import { Masonry } from "@follow/components/ui/masonry/index.js"
+import { useScrollViewElement } from "@follow/components/ui/scroll-area/hooks.js"
+import { Skeleton } from "@follow/components/ui/skeleton/index.jsx"
+import { useRefValue } from "@follow/hooks"
+import { nextFrame } from "@follow/utils/dom"
 import { throttle } from "lodash-es"
 import type { RenderComponentProps } from "masonic"
 import { useInfiniteLoader } from "masonic"
@@ -7,12 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useEventCallback } from "usehooks-ts"
 
 import { useGeneralSettingKey } from "~/atoms/settings/general"
-import { Masonry } from "~/components/ui/Masonry"
 import { MediaContainerWidthProvider } from "~/components/ui/media"
-import { useScrollViewElement } from "~/components/ui/scroll-area/hooks"
-import { Skeleton } from "~/components/ui/skeleton"
-import { useRefValue } from "~/hooks/common"
-import { nextFrame } from "~/lib/dom"
 import { getEntry } from "~/store/entry"
 import { imageActions } from "~/store/image"
 
@@ -60,7 +59,7 @@ const gutter = 24
 
 export const PictureMasonry: FC<MasonryProps> = (props) => {
   const { data } = props
-  const cacheMap = useSingleton(() => new Map<string, object>()).current
+  const cacheMap = useState(() => new Map<string, object>())[0]
   const [isInitDim, setIsInitDim] = useState(false)
   const [isInitLayout, setIsInitLayout] = useState(false)
   const [currentItemWidth, setCurrentItemWidth] = useState(0)
@@ -230,7 +229,7 @@ export const PictureMasonry: FC<MasonryProps> = (props) => {
   }, [scrollElement, renderMarkRead, scrollMarkRead, dataRef])
 
   return (
-    <div ref={containerRef} className="p-4">
+    <div ref={containerRef} className="px-4 pt-2">
       {isInitDim && isInitLayout && (
         <MasonryItemWidthContext.Provider value={currentItemWidth}>
           <MasonryItemsAspectRatioContext.Provider value={masonryItemsRadio}>
@@ -277,7 +276,7 @@ interface MasonryProps {
 
 const LoadingSkeletonItem = () => {
   // random height, between 100-400px
-  const randomHeight = useSingleton(() => Math.random() * 300 + 100).current
+  const randomHeight = useState(() => Math.random() * 300 + 100)[0]
   return (
     <div className="relative flex gap-2 overflow-x-auto">
       <div

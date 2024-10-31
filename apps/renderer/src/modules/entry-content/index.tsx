@@ -1,9 +1,17 @@
+import { AutoResizeHeight } from "@follow/components/ui/auto-resize-height/index.jsx"
+import { LoadingWithIcon } from "@follow/components/ui/loading/index.jsx"
+import { RootPortal } from "@follow/components/ui/portal/index.jsx"
+import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
+import { useTitle } from "@follow/hooks"
+import type { FeedModel, InboxModel } from "@follow/models/types"
 import { IN_ELECTRON } from "@follow/shared/constants"
+import { stopPropagation } from "@follow/utils/dom"
+import { EventBus } from "@follow/utils/event-bus"
+import { cn } from "@follow/utils/utils"
 import type { FallbackRender } from "@sentry/react"
 import { ErrorBoundary } from "@sentry/react"
 import type { FC } from "react"
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react"
-import { useHotkeys } from "react-hotkeys-hook"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -15,24 +23,15 @@ import {
 } from "~/atoms/readability"
 import { useUISettingKey } from "~/atoms/settings/ui"
 import { enableShowSourceContent } from "~/atoms/source-content"
-import { m } from "~/components/common/Motion"
 import { ShadowDOM } from "~/components/common/ShadowDOM"
-import { AutoResizeHeight } from "~/components/ui/auto-resize-height"
 import { Toc } from "~/components/ui/markdown/components/Toc"
 import { useInPeekModal } from "~/components/ui/modal/inspire/PeekModal"
-import { RootPortal } from "~/components/ui/portal"
-import { ScrollArea } from "~/components/ui/scroll-area"
-import { isWebBuild, ROUTE_FEED_PENDING } from "~/constants"
-import { shortcuts } from "~/constants/shortcuts"
+import { isWebBuild } from "~/constants"
 import { useEntryReadabilityToggle } from "~/hooks/biz/useEntryActions"
-import { useRouteParams, useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
-import { useAuthQuery, useTitle } from "~/hooks/common"
-import { stopPropagation } from "~/lib/dom"
-import { FeedViewType } from "~/lib/enum"
+import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
+import { useAuthQuery } from "~/hooks/common"
 import { getNewIssueUrl } from "~/lib/issues"
 import { LanguageMap } from "~/lib/translate"
-import { cn } from "~/lib/utils"
-import type { ActiveEntryId, FeedModel, InboxModel } from "~/models"
 import {
   useIsSoFWrappedElement,
   useWrappedElement,
@@ -41,9 +40,8 @@ import {
 import { Queries } from "~/queries"
 import { useEntry } from "~/store/entry"
 import { useFeedById } from "~/store/feed"
+import { useInboxById } from "~/store/inbox"
 
-import { LoadingWithIcon } from "../../components/ui/loading"
-import { EntryPlaceholderDaily } from "../ai/ai-daily/EntryPlaceholderDaily"
 import { EntryContentHTMLRenderer } from "../renderer/html"
 import {
   getTranslationCache,
@@ -51,11 +49,12 @@ import {
   setEntryTitleMeta,
   setTranslationCache,
 } from "./atoms"
-import { EntryPlaceholderLogo } from "./components/EntryPlaceholderLogo"
+import { EntryTimelineSidebar } from "./components/EntryTimelineSidebar"
 import { EntryTitle } from "./components/EntryTitle"
 import { SourceContentPanel } from "./components/SourceContentView"
 import { SupportCreator } from "./components/SupportCreator"
 import { EntryHeader } from "./header"
+import { useFocusEntryContainerSubscriptions } from "./hooks"
 import { EntryContentLoading } from "./loading"
 
 export interface EntryContentClassNames {
@@ -67,32 +66,11 @@ export const EntryContent = ({
   compact,
   classNames,
 }: {
-  entryId: ActiveEntryId
+  entryId: string
   noMedia?: boolean
   compact?: boolean
   classNames?: EntryContentClassNames
 }) => {
-  const { feedId, view } = useRouteParams()
-  const enableEntryWideMode = useUISettingKey("wideMode")
-
-  if (!entryId) {
-    if (enableEntryWideMode) {
-      return null
-    }
-    return (
-      <m.div
-        className="center size-full flex-col"
-        initial={{ opacity: 0.01, y: 300 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <EntryPlaceholderLogo />
-        {feedId === ROUTE_FEED_PENDING && view === FeedViewType.Articles && (
-          <EntryPlaceholderDaily view={view} />
-        )}
-      </m.div>
-    )
-  }
-
   return (
     <EntryContentRender
       entryId={entryId}
@@ -116,9 +94,10 @@ export const EntryContentRender: Component<{
 
   const feed = useFeedById(entry?.feedId) as FeedModel | InboxModel
   const readerRenderInlineStyle = useUISettingKey("readerRenderInlineStyle")
+  const inbox = useInboxById(entry?.inboxId, (inbox) => inbox !== null)
 
   const { error, data, isPending } = useAuthQuery(
-    feed?.type === "inbox" ? Queries.entries.byInboxId(entryId) : Queries.entries.byId(entryId),
+    inbox ? Queries.entries.byInboxId(entryId) : Queries.entries.byId(entryId),
     {
       staleTime: 300_000,
     },
@@ -146,15 +125,8 @@ export const EntryContentRender: Component<{
   const scrollerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     scrollerRef.current?.scrollTo(0, 0)
+    scrollerRef.current?.focus()
   }, [entryId])
-
-  useHotkeys(shortcuts.entry.scrollDown.key, () => {
-    scrollerRef.current?.scrollBy(0, window.innerHeight / 2)
-  })
-
-  useHotkeys(shortcuts.entry.scrollUp.key, () => {
-    scrollerRef.current?.scrollBy(0, -window.innerHeight / 2)
-  })
 
   const isPeekModal = useInPeekModal()
 
@@ -162,6 +134,7 @@ export const EntryContentRender: Component<{
     () => (isPeekModal ? undefined : <ContainerToc key={entryId} />),
     [entryId, isPeekModal],
   )
+  useFocusEntryContainerSubscriptions(scrollerRef)
   const stableRenderStyle = useMemo(
     () =>
       readerFontFamily
@@ -215,6 +188,8 @@ export const EntryContentRender: Component<{
     })
   }
 
+  const isInbox = !!inbox
+
   return (
     <>
       <EntryHeader
@@ -224,10 +199,11 @@ export const EntryContentRender: Component<{
         compact={compact}
       />
 
-      <div className="relative flex size-full flex-col overflow-hidden">
+      <div className="relative flex size-full flex-col overflow-hidden @container">
+        <EntryTimelineSidebar entryId={entry.entries.id} />
         <ScrollArea.ScrollArea
           mask={false}
-          rootClassName={cn("h-0 min-w-0 grow overflow-y-auto @container", className)}
+          rootClassName={cn("h-0 min-w-0 grow overflow-y-auto", className)}
           scrollbarClassName="mr-[1.5px]"
           viewportClassName="p-5"
           ref={scrollerRef}
@@ -245,7 +221,7 @@ export const EntryContentRender: Component<{
               <EntryTitle entryId={entryId} compact={compact} />
 
               <WrappedElementProvider boundingDetection>
-                <div className="mx-auto mb-32 mt-8 max-w-full cursor-auto select-text break-all text-[0.94rem]">
+                <div className="mx-auto mb-32 mt-8 max-w-full cursor-auto select-text text-[0.94rem]">
                   <TitleMetaHandler entryId={entry.entries.id} />
                   {(summary.isLoading || summary.data) && (
                     <div className="my-8 space-y-1 rounded-lg border px-4 py-3">
@@ -260,7 +236,7 @@ export const EntryContentRender: Component<{
                   )}
                   <ErrorBoundary fallback={RenderError}>
                     {!isInReadabilityMode ? (
-                      <ShadowDOM>
+                      <ShadowDOM injectHostStyles={!isInbox}>
                         <EntryContentHTMLRenderer
                           view={view}
                           feedId={feed?.id}
@@ -284,7 +260,7 @@ export const EntryContentRender: Component<{
                 </div>
               </WrappedElementProvider>
 
-              {entry.settings?.readability && (
+              {entry.settings?.readability && IN_ELECTRON && (
                 <ReadabilityAutoToggleEffect id={entry.entries.id} url={entry.entries.url ?? ""} />
               )}
               {entry.settings?.sourceContent && <ViewSourceContentAutoToggleEffect />}
@@ -293,7 +269,7 @@ export const EntryContentRender: Component<{
                 <div className="center mt-16 min-w-0">
                   {isPending ? (
                     <EntryContentLoading
-                      icon={feed?.type === "inbox" ? undefined : feed?.siteUrl!}
+                      icon={!isInbox ? (feed as FeedModel)?.siteUrl! : undefined}
                     />
                   ) : error ? (
                     <div className="center flex min-w-0 flex-col gap-2">
@@ -314,7 +290,7 @@ export const EntryContentRender: Component<{
                 </div>
               )}
 
-              {feed?.ownerUserId && <SupportCreator entryId={entryId} />}
+              <SupportCreator entryId={entryId} />
             </article>
           </div>
         </ScrollArea.ScrollArea>
@@ -338,10 +314,12 @@ const TitleMetaHandler: Component<{
   const {
     entries: { title: entryTitle },
     feedId,
+    inboxId,
   } = useEntry(entryId)!
 
-  const { title: feedTitle } = useFeedById(feedId)!
-
+  const feed = useFeedById(feedId)
+  const inbox = useInboxById(inboxId)
+  const feedTitle = feed?.title || inbox?.title
   const atTop = useIsSoFWrappedElement()
   useEffect(() => {
     setEntryContentScrollToTop(true)
@@ -490,11 +468,15 @@ const RenderError: FallbackRender = ({ error }) => {
 
 const ContainerToc: FC = memo(() => {
   const wrappedElement = useWrappedElement()
+
   return (
     <RootPortal to={wrappedElement!}>
       <div className="group absolute right-[-130px] top-0 h-full w-[100px]">
         <div className="sticky top-0">
           <Toc
+            onItemClick={() => {
+              EventBus.dispatch("FOCUS_ENTRY_CONTAINER")
+            }}
             className={cn(
               "flex flex-col items-end animate-in fade-in-0 slide-in-from-bottom-12 easing-spring spring-soft",
               "max-h-[calc(100vh-100px)] overflow-auto scrollbar-none",

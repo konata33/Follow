@@ -1,14 +1,18 @@
+import { createSettingAtom } from "@follow/atoms/helper/setting.js"
 import type { UISettings } from "@follow/shared/interface/settings"
+import { atom, useAtomValue } from "jotai"
 
-import { createSettingAtom } from "./helper"
+import { internal_feedColumnShowAtom } from "../sidebar"
 
 export const createDefaultSettings = (): UISettings => ({
   // Sidebar
   entryColWidth: 356,
   feedColWidth: 256,
+  hideExtraBadge: false,
 
   opaqueSidebar: false,
   sidebarShowUnreadCount: true,
+  thumbnailRatio: "square",
 
   // Global UI
   uiTextSize: 16,
@@ -30,14 +34,12 @@ export const createDefaultSettings = (): UISettings => ({
   codeHighlightThemeDark: "github-dark",
   guessCodeLanguage: true,
   hideRecentReader: false,
+  customCSS: "",
 
   // View
   pictureViewMasonry: true,
   pictureViewFilterNoImage: false,
   wideMode: false,
-
-  // TTS
-  voice: "en-US-AndrewMultilingualNeural",
 })
 
 export const {
@@ -55,5 +57,12 @@ export const uiServerSyncWhiteListKeys: (keyof UISettings)[] = [
   "uiFontFamily",
   "readerFontFamily",
   "opaqueSidebar",
-  "voice",
+  "customCSS",
 ]
+
+const isZenModeAtom = atom((get) => {
+  const ui = get(__uiSettingAtom)
+  return ui.wideMode && !get(internal_feedColumnShowAtom)
+})
+
+export const useIsZenMode = () => useAtomValue(isZenModeAtom)
